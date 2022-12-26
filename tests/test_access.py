@@ -1,36 +1,57 @@
-import pytest
-import os
 import logging
+import os
 
-from access import Access
+import pytest
 
-EXAMPLE = "abc.com\nname1\npassword1\n\nxyz.com\nname2\npassword2"
-PASSWORD = "12345678"
+from access import ARCHIVE_NAME, Access
+
+CONTENT_EXAMPLE = "abc.com\nname1\npassword1\n\nxyz.com\nname2\npassword2"
+PASSWORD_EXAMPLE = "12345678"
+
 _logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="class")
-def content_file(tmpdir_factory):
-    _logger.debug("Creating a content file...")
+def file_with_content(tmpdir_factory) -> str:
+    _logger.debug("Creating a content file in tmp")
     file_name = "example10102021.txt"
     tmp = tmpdir_factory.mktemp("access")
-    with open(tmp.join(file_name), "w+", encoding='utf8') as f:
-        f.write(EXAMPLE)
-    return tmp, file_name
+    file_path = tmp.join(file_name)
+    with open(file_path, "w+", encoding='utf8') as f:
+        f.write(CONTENT_EXAMPLE)
+    return str(file_path)
 
 
 @pytest.fixture(scope="class")
-def archive(content_file):
-    _logger.debug("Creating an archive file...")
-    tmp, file_name = content_file
-    archive_path = tmp.join(f"{file_name}.gpg")
-    os.system(f"gpg --pinentry-mode=loopback --passphrase {PASSWORD} -c -o {archive_path} --no-symkey-cache {tmp.join(file_name)}")
+def archive(tmpdir_factory, file_with_content):
+    _logger.debug("Creating a private archive file")
+    tmp = tmpdir_factory.mktemp("archive")
+    archive_path = tmp.join("private_archive.gpg")
+    create_archive_command = f"gpg --pinentry-mode=loopback --passphrase {PASSWORD_EXAMPLE} -c -o {archive_path} " \
+                             f"--no-symkey-cache {file_with_content}"
+    os.system(create_archive_command)
     return archive_path
 
 
 class TestAccess:
     @staticmethod
-    def test_key_search(archive):
+    @pytest.mark.parametrize(
+        "key, result",
+        [
+            ("abc.com", ['abc.com\nname1\npassword1']),
+            ("xyz.com", ['xyz.com\nname2\npassword2']),
+        ])
+    def test_found_proper_result_for_key(archive, key, result):
         access = Access(os.path.dirname(archive))
-        found = access.search("abc.com")
-        assert found
+        access.search_and_decrypt_file()
+        assert access.search(key) == result
+
+    @staticmethod
+    def test_pack_file_to_archive(file_with_content):
+        assert os.path.exists(file_with_content)
+        tmp_dir = os.path.dirname(file_with_content)
+        access = Access(tmp_dir)
+        access.search_and_encrypt_file()
+        archive_path = os.path.join(tmp_dir, ARCHIVE_NAME)
+        assert not os.path.exists(file_with_content)
+        assert os.path.exists(archive_path)
