@@ -4,13 +4,15 @@ import re
 from datetime import datetime
 from typing import List, Optional
 
-_logger = logging.getLogger(__name__)
-_logger.setLevel(logging.DEBUG)
-_logger.addHandler(logging.StreamHandler())
+_log = logging.getLogger(__name__)
+_log.setLevel(logging.DEBUG)
+_log.addHandler(logging.StreamHandler())
 
 PRIVACY_ARCHIVE_EXTENSION = "gpg"
 PRIVACY_FILE_EXTENSION = "txt"
 ARCHIVE_NAME = f'dos_{datetime.today().strftime("%d%m%Y")}.{PRIVACY_ARCHIVE_EXTENSION}'
+
+
 # TODO: Add possibility to unpack, add content and pack again
 
 
@@ -36,19 +38,19 @@ class Access:
             file_to_pack = files[0]
             self._pack_file_to_gpg(file_to_pack)
         except AssertionError:
-            _logger.exception("Error on encrypting new file")
+            _log.exception("Error on encrypting new file")
 
     def search_and_decrypt_file(self) -> None:
         try:
             archives = self._sorted_files(extension=PRIVACY_ARCHIVE_EXTENSION)
-            _logger.info(f"Latest archive file: {archives[0]}")
+            _log.info(f"Latest archive file: {archives[0]}")
             unpacked_file = self._unpack_gpg(archives[0])
             self.__content = self._read_file(unpacked_file)
         except AssertionError:
-            _logger.exception("Error on decrypting the archive")
+            _log.exception("Error on decrypting the archive")
 
     def _sorted_files(self, extension: str) -> List[str]:
-        _logger.debug(f'Searching files in "{self._path}" with extension "{extension}"')
+        _log.debug(f'Searching files in "{self._path}" with extension "{extension}"')
         file_paths = [os.path.join(self._path, p) for p in os.listdir(self._path) if p.endswith(extension)]
         if not file_paths:
             raise AssertionError(f"Files not found in {self._path}")
@@ -64,14 +66,14 @@ class Access:
     def search(self, key: str) -> List[str]:
         pattern = rf".*{key.lower()}.*[\t\n]"
         if self.__content is None:
-            _logger.error("File content is empty")
+            _log.error("File content is empty")
             return [""]
         return [item for item in self.__content if re.match(pattern, item.lower())]
 
     @staticmethod
     def _unpack_gpg(archive_path: str) -> str:
         # TODO unpack to the memory
-        _logger.debug("Unpacking the private archive...")
+        _log.debug("Unpacking the private archive...")
         command = f'gpg --decrypt --no-symkey-cache --output {archive_path.split(".")[0]} {archive_path}'
         result = os.system(command)
         if result != 0:

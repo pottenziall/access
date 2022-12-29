@@ -8,12 +8,12 @@ from access import ARCHIVE_NAME, Access
 CONTENT_EXAMPLE = "abc.com\nname1\npassword1\n\nxyz.com\nname2\npassword2"
 PASSWORD_EXAMPLE = "12345678"
 
-_logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="class")
 def file_with_content(tmpdir_factory) -> str:
-    _logger.debug("Creating a content file in tmp")
+    _log.debug("Creating a content file in tmp")
     file_name = "example10102021.txt"
     tmp = tmpdir_factory.mktemp("access")
     file_path = tmp.join(file_name)
@@ -24,7 +24,7 @@ def file_with_content(tmpdir_factory) -> str:
 
 @pytest.fixture(scope="class")
 def archive(tmpdir_factory, file_with_content):
-    _logger.debug("Creating a private archive file")
+    _log.debug("Creating a private archive file")
     tmp = tmpdir_factory.mktemp("archive")
     archive_path = tmp.join("private_archive.gpg")
     create_archive_command = f"gpg --pinentry-mode=loopback --passphrase {PASSWORD_EXAMPLE} -c -o {archive_path} " \
