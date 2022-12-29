@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from access import ARCHIVE_NAME, Access
+from access import Access
 
 CONTENT_EXAMPLE = "abc.com\nname1\npassword1\n\nxyz.com\nname2\npassword2"
 PASSWORD_EXAMPLE = "12345678"
@@ -36,22 +36,24 @@ def archive(tmpdir_factory, file_with_content):
 class TestAccess:
     @staticmethod
     @pytest.mark.parametrize(
-        "key, result",
+        "keyword, result",
         [
             ("abc.com", ['abc.com\nname1\npassword1']),
             ("xyz.com", ['xyz.com\nname2\npassword2']),
         ])
-    def test_found_proper_result_for_key(archive, key, result):
+    def test_found_proper_result_for_keyword(archive, keyword, result):
         access = Access(os.path.dirname(archive))
-        access.search_and_decrypt_file()
-        assert access.search(key) == result
+        access.search_and_decrypt_latest_file()
+        found = access.search(keyword)
+        assert found == result
 
-    @staticmethod
-    def test_pack_file_to_archive(file_with_content):
-        assert os.path.exists(file_with_content)
-        tmp_dir = os.path.dirname(file_with_content)
-        access = Access(tmp_dir)
-        access.search_and_encrypt_file()
-        archive_path = os.path.join(tmp_dir, ARCHIVE_NAME)
-        assert not os.path.exists(file_with_content)
-        assert os.path.exists(archive_path)
+    # @staticmethod
+    # def test_pack_file_to_archive(file_with_content):
+    #     assert os.path.exists(file_with_content)
+    #     tmp_dir = os.path.dirname(file_with_content)
+    #     access = Access(tmp_dir)
+    #     access.search_and_encrypt_file()
+    #     archive_name = generate_archive_name()
+    #     archive_path = os.path.join(tmp_dir, archive_name)
+    #     assert not os.path.exists(file_with_content)
+    #     assert os.path.exists(archive_path)

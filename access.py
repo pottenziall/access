@@ -1,51 +1,39 @@
+import io
 import logging
 import os
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import List
+
+import utils
 
 _log = logging.getLogger(__name__)
-_log.setLevel(logging.DEBUG)
-_log.addHandler(logging.StreamHandler())
 
 PRIVACY_ARCHIVE_EXTENSION = "gpg"
 PRIVACY_FILE_EXTENSION = "txt"
-ARCHIVE_NAME = f'dos_{datetime.today().strftime("%d%m%Y")}.{PRIVACY_ARCHIVE_EXTENSION}'
+
+
+def generate_archive_name() -> str:
+    basename = "dos_" + datetime.today().strftime("%d%m%Y")
+    return basename + "." + PRIVACY_ARCHIVE_EXTENSION
 
 
 # TODO: Add possibility to unpack, add content and pack again
 
 
-def remove_file(file_path: str) -> None:
-    if not os.path.exists(file_path):
-        raise AssertionError(f"Try to remove non-existing file: {file_path}")
-    while range(5):
-        os.remove(file_path)
-        if not os.path.exists(file_path):
-            return
-    raise AssertionError(f"Not possible to remove file: {file_path}")
-
-
 class Access:
     def __init__(self, dir_path: str):
         self._path = dir_path
-        self.__content: Optional[List[str]] = None
+        self.__content: str = ""
+        self._added_new_content: bool = False
 
-    def search_and_encrypt_file(self) -> None:
-        try:
-            files = self._sorted_files(extension=PRIVACY_FILE_EXTENSION)
-            assert len(files) == 1, f"More than one file found to pack: {files}"
-            file_to_pack = files[0]
-            self._pack_file_to_gpg(file_to_pack)
-        except AssertionError:
-            _log.exception("Error on encrypting new file")
-
-    def search_and_decrypt_file(self) -> None:
+    def search_and_decrypt_latest_file(self) -> None:
         try:
             archives = self._sorted_files(extension=PRIVACY_ARCHIVE_EXTENSION)
             _log.info(f"Latest archive file: {archives[0]}")
             unpacked_file = self._unpack_gpg(archives[0])
-            self.__content = self._read_file(unpacked_file)
+            self.__content = utils.get_file_content(unpacked_file)
+            utils.remove_file(unpacked_file)
         except AssertionError:
             _log.exception("Error on decrypting the archive")
 
@@ -56,23 +44,19 @@ class Access:
             raise AssertionError(f"Files not found in {self._path}")
         return sorted(file_paths, key=lambda x: os.path.getctime(x), reverse=True)
 
-    @staticmethod
-    def _read_file(file_path: str) -> List[str]:
-        with open(file_path, "r", encoding='utf8') as f:
-            content = f.read().split("\n\n")
-        remove_file(file_path)
-        return content
-
     def search(self, key: str) -> List[str]:
         pattern = rf".*{key.lower()}.*[\t\n]"
-        if self.__content is None:
+        if not self.__content:
             _log.error("File content is empty")
             return [""]
-        return [item for item in self.__content if re.match(pattern, item.lower())]
+        found = [item for item in self.__content.split("\n\n") if re.match(pattern, item.lower())]
+        if not found:
+            _log.info(f'Phrase "{key}" not found')
+        return found
 
     @staticmethod
     def _unpack_gpg(archive_path: str) -> str:
-        # TODO unpack to the memory
+        # TODO unpack into a memory
         _log.debug("Unpacking the private archive...")
         command = f'gpg --decrypt --no-symkey-cache --output {archive_path.split(".")[0]} {archive_path}'
         result = os.system(command)
@@ -82,12 +66,35 @@ class Access:
         assert os.path.exists(file_path), "Unpacked file not found"
         return file_path
 
-    def _pack_file_to_gpg(self, file_path: str) -> str:
-        new_archive_path = os.path.join(self._path, ARCHIVE_NAME)
+    def pack_content_to_gpg(self) -> None:
+        """
+
+        try:
+            p = Popen(cmd, shell=False, stdin=PIPE, stdout=PIPE, stderr=PIPE
+            stdin = p.stdin
+            if passphrase:
+                _write_passphrase(stdin, passphrase, self.encoding)
+            writer = _threaded_copy_data(fileobj, stdin)
+            self._collect_output(p, result, writer, stdin)
+            return result
+        finally:
+            writer.join(0.01)
+            if fileobj is not fileobj_or_path:
+                fileobj.close()
+        """
+        if not self._added_new_content:
+            _log.info("Content not changed, archive creation canceled")
+            # return
+        vfile = io.StringIO(initial_value=self.__content)
+        archive_name = generate_archive_name()
+        new_archive_path = os.path.join(self._path, archive_name)
         encrypt_file_command = f"gpg --symmetric --output {new_archive_path} " \
-                               f"--no-symkey-cache {file_path}"
+                               f"--no-symkey-cache {vfile}"
         exit_code = os.system(encrypt_file_command)
         if exit_code != 0:
-            raise AssertionError(f'Error when encrypting "{file_path}": {exit_code}')
-        remove_file(file_path)
-        return new_archive_path
+            raise AssertionError(f'Error when encrypting: {exit_code}')
+        _log.info(f"Archive with new content successfully created: {new_archive_path}")
+
+    def add_content(self, new_content: str) -> None:
+        self.__content = self.__content + new_content
+        self._added_new_content = True

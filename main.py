@@ -1,81 +1,85 @@
+import argparse
 import logging
-import os
-import re
 import select
 import sys
-import time
-from typing import List
+from typing import Dict
 
+import utils
 from access import Access, PRIVACY_ARCHIVE_EXTENSION
 
+# TODO: error when wrong password
 DISPLAY_TIMEOUT = 20
-PRIVACY_FILE_PATH = "/home/vova/My/bases/dos"
+PRIVACY_DIR_PATH = "/home/vova/My/bases/dos/tes_dos"
 APP = "gpg"
-INPUT_VALUE_PATTERN = "^[A-Za-z0-9]{3,}$"
+SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9]{3,}$"
+ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
 _log = logging.getLogger(__name__)
-_log.setLevel(logging.DEBUG)
-_log.addHandler(logging.StreamHandler())
+
+logging.basicConfig(
+    format="%(message)s",
+    level=logging.DEBUG,
+    handlers=[logging.StreamHandler()],
+)
+
+parser = argparse.ArgumentParser(description='Access')
+parser.add_argument("-a", "--add", help="Add credentials", action="store_true")
+app_args = vars(parser.parse_args())
 
 
-def _program_exist(name: str) -> bool:
-    exit_code = os.system(f"which {name}")
-    if exit_code == 0:
-        return True
-    _log.error(f'Program "{name}" does not installed')
-    return False
+def _get_input_value(timeout: int = 30) -> str:
+    while True:
+        inp, o, e = select.select([sys.stdin], [], [], timeout)
+        if not inp:
+            break
+        return sys.stdin.readline().strip()
+    _log.info("Timeout reached, closing the application...")
+    raise KeyboardInterrupt
 
 
-def _is_valid(phrase: str, pattern: str = INPUT_VALUE_PATTERN) -> bool:
-    if re.match(pattern, phrase):
-        return True
-    _log.info("Wrong input")
-    return False
-
-
-def print_and_clear(data: List[str], timeout: int = 5) -> None:
-    for item in data:
-        _log.info(item)
-    time.sleep(timeout)
-    os.system("clear")
-
-
-def clear_sensitives(path: str):
-    _log.info("Clear sensitives...")
-    files = [file for file in os.listdir(path) if not file.endswith(f".{PRIVACY_ARCHIVE_EXTENSION}")]
-    if files:
-        for name in files:
-            os.remove(os.path.join(PRIVACY_FILE_PATH, name))
-
-
-def main():
-    if not _program_exist(APP):
+def main(args: Dict[str, str]):
+    if not utils.program_exists(APP):
+        _log.error(f'Program "{APP}" not found. Please, install')
         return
     try:
-        access = Access(PRIVACY_FILE_PATH)
-        access.search_and_decrypt_file()
-        while True:
-            _log.info("Please, type phrase to search: ")
-            inp, o, e = select.select([sys.stdin], [], [], 30)
-            if not inp:
-                break
-            phrase = sys.stdin.readline().strip()
-            if _is_valid(phrase):
-                found = access.search(phrase)
-                if found:
-                    print_and_clear(found)
-                _log.info(f'Phrase "{phrase}" not found')
-            continue
-        raise KeyboardInterrupt
+        access = Access(PRIVACY_DIR_PATH)
+        access.search_and_decrypt_latest_file()
+        if args.get("add", False):
+            i = 5
+            while i > 0:
+                _log.info("Please, enter credentials (like gmail.com mylogin 12345678")
+                value = _get_input_value(timeout=60)
+                if utils.validate_input(value=value, pattern=ADDING_VALUE_PATTERN):
+                    access.add_content(value)
+                i -= 1
+            access.pack_content_to_gpg()
+        else:
+            while True:
+                _log.info("Please, type a phrase to search: ")
+                value = _get_input_value()
+                if utils.validate_input(value=value, pattern=SEARCH_VALUE_PATTERN):
+                    found = access.search(value)
+                    utils.print_and_clear(found)
     except Exception:
         _log.exception(f"Program failed")
     except KeyboardInterrupt:
         sys.exit(1)
     finally:
-        clear_sensitives(PRIVACY_FILE_PATH)
-        os.system("clear")
-        _log.info("End program")
+        # os.system("clear")
+        utils.clear_sensitives(PRIVACY_DIR_PATH, exclude=PRIVACY_ARCHIVE_EXTENSION)
 
 
 if __name__ == "__main__":
-    main()
+    # TODO: try gnupg below
+
+    # gpg = gnupg.GPG(gnupghome="/home/vova/My/bases/dos/tes_dos/")
+    # gpg.encrypt("12345", "12", symmetric=True,  output="/home/vova/My/bases/dos/tes_dos/new.gpg")
+    # gpg.encrypt("some data", "me", symmetric=True, passphrase="12345678", output="/home/vova/My/bases/dos/tes_dos/new.gpg")
+
+    # bf = io.BytesIO(b'123')
+    # os.system(f"gpg --symmetric --output {'/home/vova/My/bases/dos/tes_dos/dos_06012023.gpg'} --no-symkey-cache {bf}")
+    try:
+        main(app_args)
+    finally:
+        utils.clear_sensitives(PRIVACY_DIR_PATH, exclude=PRIVACY_ARCHIVE_EXTENSION)
+        _log.info("End program")
