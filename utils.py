@@ -1,18 +1,12 @@
+import json
 import logging
 import os
 import re
 import time
-from typing import List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 _log = logging.getLogger(__name__)
-
-
-def program_exists(name: str) -> bool:
-    program_exist_command = f"which {name}"
-    exit_code = os.system(program_exist_command)
-    if exit_code == 0:
-        return True
-    return False
 
 
 def validate_input(value: str, pattern: str) -> bool:
@@ -22,41 +16,42 @@ def validate_input(value: str, pattern: str) -> bool:
     return False
 
 
-def print_and_clear(data: List[str], timeout: int = 5) -> None:
+def print_data(data: List[str]) -> None:
     if not data:
-        return
-    _log.info(f'{40 * ">"}')
-    for item in data:
-        _log.info(item)
-    _log.info(f'{40 * "<"}')
-    time.sleep(timeout)
-    os.system("clear && clear")
+        data = ["no data"]
+    os.system(f'tput setaf 2')
+    for item in data[:-1]:
+        _log.info(item + "\n")
+    _log.info(data[-1])
+    os.system('tput setaf 7')
+    c = 0
+    for i in data:
+        c += len(i.split("\n"))
+    c = c + 2
+    time.sleep(5)
+    os.system(f"tput cuu {c} && tput ed")
 
 
-def clear_sensitives(path: str, exclude: str) -> None:
+def clear_sensitives(path: Path, exclude: str) -> None:
     _log.info("Clear sensitives...")
     for directory, _, files in os.walk(path):
         files_to_remove = [file for file in files if not file.endswith(f".{exclude}")]
         if files_to_remove:
             for file in files_to_remove:
                 os.remove(os.path.join(directory, file))
-            _log.debug(f'"{len(files_to_remove)}" files removed')
+            _log.debug(f"{len(files_to_remove)} files have been removed from {path}")
 
 
-def get_file_content(file_path: str) -> str:
-    try:
-        with open(file_path, "r", encoding='utf8') as f:
-            return f.read()
-    except Exception:
-        _log.exception(f'Error when reading "{file_path}" file')
-        return ""
+def read_config(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.is_file():
+        _log.warning(f"Config file does not exist or is not a file: {path}")
+        return None
+    with open(path, encoding="utf8") as f:
+        return json.loads(f.read())
 
 
-def remove_file(file_path: str, tries: int = 5) -> None:
-    if not os.path.exists(file_path):
-        raise AssertionError(f"Try to remove non-existing file: {file_path}")
-    for _ in range(tries):
-        os.remove(file_path)
-        if not os.path.exists(file_path):
-            return
-    raise AssertionError(f"Not possible to remove file: {file_path}")
+def add_to_config(path: Path, data: Dict[str, Any]) -> None:
+    with open(path, "w+", encoding="utf-8") as f:
+        content = json.load(f) if f.read() else {}
+        content.update(data)
+        json.dump(content, f)

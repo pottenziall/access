@@ -1,30 +1,42 @@
 import argparse
 import logging
+import os
 import select
 import sys
+from pathlib import Path
 from typing import Dict
 
 import utils
-from access import Access, PRIVACY_ARCHIVE_EXTENSION
+from access import Access
 
 # TODO: error when wrong password
 DISPLAY_TIMEOUT = 20
-PRIVACY_DIR_PATH = "/home/vova/My/bases/dos/tes_dos"
+APP_DIR = Path(f"{__file__}").parent
+CONFIG_FILE_PATH = APP_DIR / "config"
 APP = "gpg"
 SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9]{3,}$"
 ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger("main")
 
 logging.basicConfig(
     format="%(message)s",
-    level=logging.DEBUG,
+    level=logging.INFO,
     handlers=[logging.StreamHandler()],
 )
 
-parser = argparse.ArgumentParser(description='Access')
-parser.add_argument("-a", "--add", help="Add credentials", action="store_true")
+parser = argparse.ArgumentParser(description="Search for credentials")
+parser.add_argument("-d", "--debug", help="Enable debug mode", action="store_true")
+parser.add_argument(
+    "-w",
+    "--work_dir",
+    help="Work directory, otherwise - default path will be used. The path will be stored in config file",
+)
+parser.add_argument(
+    "--add", help="Add credentials and save in a new archive", action="store_true"
+)
 app_args = vars(parser.parse_args())
+print("ok")
 
 
 def _get_input_value(timeout: int = 30) -> str:
@@ -32,54 +44,80 @@ def _get_input_value(timeout: int = 30) -> str:
         inp, o, e = select.select([sys.stdin], [], [], timeout)
         if not inp:
             break
-        return sys.stdin.readline().strip()
+        return sys.stdin.readline().strip().lower()
     _log.info("Timeout reached, closing the application...")
     raise KeyboardInterrupt
 
 
-def main(args: Dict[str, str]):
-    if not utils.program_exists(APP):
-        _log.error(f'Program "{APP}" not found. Please, install')
-        return
+def _set_loggers_debug_level() -> None:
+    loggers = ["main", "utils", "access"]
+    for name in loggers:
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)
+    #_log.setLevel(logging.DEBUG)
+
+
+def _search(access: Access) -> None:
+    # access = Access(DEFAULT_PRIVACY_DIR_PATH)
+    while True:
+       # os.system("tput sc")
+        _log.info("Type a phrase to search (min 3 ch):")
+        value = _get_input_value()
+        if utils.validate_input(value=value, pattern=SEARCH_VALUE_PATTERN):
+            found = access.search_in_content(value)
+            utils.print_data(found)
+
+
+def _add(access: Access) -> None:
+    _log.info(f"Please, enter credentials, like gmail.com mylogin 12345678)")
     try:
-        access = Access(PRIVACY_DIR_PATH)
-        access.search_and_decrypt_latest_file()
-        if args.get("add", False):
-            i = 5
-            while i > 0:
-                _log.info("Please, enter credentials (like gmail.com mylogin 12345678")
-                value = _get_input_value(timeout=60)
-                if utils.validate_input(value=value, pattern=ADDING_VALUE_PATTERN):
-                    access.add_content(value)
-                i -= 1
-            access.pack_content_to_gpg()
-        else:
-            while True:
-                _log.info("Please, type a phrase to search: ")
-                value = _get_input_value()
-                if utils.validate_input(value=value, pattern=SEARCH_VALUE_PATTERN):
-                    found = access.search(value)
-                    utils.print_and_clear(found)
-    except Exception:
-        _log.exception(f"Program failed")
+        while True:
+            _log.info(f"New credentials:")
+            # TODO: Is case valid when cut input data after 30s?
+            value = _get_input_value(timeout=60)
+            if utils.validate_input(value=value, pattern=ADDING_VALUE_PATTERN):
+                access.add_content(value)
     except KeyboardInterrupt:
+        access.encrypt_and_export_to_new_file_if_content_updated()
+        raise
+
+
+def main(args: Dict[str, str]) -> None:
+    enabled_args = [a for a in args if args[a]]
+    if enabled_args:
+        _log.info(f"Run app with args: {enabled_args}")
+    try:
+        if args.get("debug", False):
+            _set_loggers_debug_level()
+            _log.info("Debug mode enabled")
+        if args.get("work_dir", False):
+            work_dir = Path(args["work_dir"])
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": args["work_dir"]})
+        else:
+            config_content = utils.read_config(path=CONFIG_FILE_PATH)
+            if config_content and "work_dir" in config_content:
+                work_dir = Path(config_content["work_dir"])
+            else:
+                work_dir = APP_DIR
+                utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)})
+        access = Access(work_dir)
+        if args.get("add", False):
+            _add(access)
+        else:
+            _search(access)
+    except Exception:
+        if _log.level == 0:
+            _log.error("Program failed")
+        else:
+            _log.exception("Program failed:")
+    except KeyboardInterrupt:
+        os.system("tput rc && tput rc && tput ed")
         sys.exit(1)
     finally:
-        # os.system("clear")
-        utils.clear_sensitives(PRIVACY_DIR_PATH, exclude=PRIVACY_ARCHIVE_EXTENSION)
+        # utils.clear_sensitives(DEFAULT_PRIVACY_DIR_PATH, exclude=APP)
+        _log.info("Application closed")
 
 
 if __name__ == "__main__":
-    # TODO: try gnupg below
-
-    # gpg = gnupg.GPG(gnupghome="/home/vova/My/bases/dos/tes_dos/")
-    # gpg.encrypt("12345", "12", symmetric=True,  output="/home/vova/My/bases/dos/tes_dos/new.gpg")
-    # gpg.encrypt("some data", "me", symmetric=True, passphrase="12345678", output="/home/vova/My/bases/dos/tes_dos/new.gpg")
-
-    # bf = io.BytesIO(b'123')
-    # os.system(f"gpg --symmetric --output {'/home/vova/My/bases/dos/tes_dos/dos_06012023.gpg'} --no-symkey-cache {bf}")
-    try:
+    if app_args:
         main(app_args)
-    finally:
-        utils.clear_sensitives(PRIVACY_DIR_PATH, exclude=PRIVACY_ARCHIVE_EXTENSION)
-        _log.info("End program")
