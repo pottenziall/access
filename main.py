@@ -4,7 +4,6 @@ import os
 import select
 import sys
 from pathlib import Path
-from typing import Dict
 
 import utils
 from access import Access
@@ -25,18 +24,23 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-parser = argparse.ArgumentParser(description="Search for credentials")
-parser.add_argument("-d", "--debug", help="Enable debug mode", action="store_true")
-parser.add_argument(
-    "-w",
-    "--work_dir",
-    help="Work directory, otherwise - default path will be used. The path will be stored in config file",
-)
-parser.add_argument(
-    "--add", help="Add credentials and save in a new archive", action="store_true"
-)
-app_args = vars(parser.parse_args())
-print("ok")
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Search for credentials in an encrypted archive"
+    )
+    parser.add_argument(
+        "--add",
+        help="Add credentials and save it in a new archive",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-w",
+        "--work_dir",
+        help="Work directory, otherwise - default path will be used. The path will be stored in config file",
+    )
+    parser.add_argument("-d", "--debug", help="Enable debug mode", action="store_true")
+    return parser.parse_args()
 
 
 def _get_input_value(timeout: int = 30) -> str:
@@ -54,13 +58,13 @@ def _set_loggers_debug_level() -> None:
     for name in loggers:
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
-    #_log.setLevel(logging.DEBUG)
+    # _log.setLevel(logging.DEBUG)
 
 
 def _search(access: Access) -> None:
     # access = Access(DEFAULT_PRIVACY_DIR_PATH)
     while True:
-       # os.system("tput sc")
+        # os.system("tput sc")
         _log.info("Type a phrase to search (min 3 ch):")
         value = _get_input_value()
         if utils.validate_input(value=value, pattern=SEARCH_VALUE_PATTERN):
@@ -82,26 +86,28 @@ def _add(access: Access) -> None:
         raise
 
 
-def main(args: Dict[str, str]) -> None:
-    enabled_args = [a for a in args if args[a]]
+def main(args: argparse.Namespace) -> None:
+    enabled_args = [a for a in vars(args) if vars(args)[a]]
     if enabled_args:
         _log.info(f"Run app with args: {enabled_args}")
     try:
-        if args.get("debug", False):
+        if args.debug:
             _set_loggers_debug_level()
             _log.info("Debug mode enabled")
-        if args.get("work_dir", False):
-            work_dir = Path(args["work_dir"])
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": args["work_dir"]})
+        if args.work_dir:
+            work_dir = Path(args.work_dir)
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": args.work_dir})
         else:
             config_content = utils.read_config(path=CONFIG_FILE_PATH)
             if config_content and "work_dir" in config_content:
                 work_dir = Path(config_content["work_dir"])
             else:
                 work_dir = APP_DIR
-                utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)})
+                utils.add_to_config(
+                    path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)}
+                )
         access = Access(work_dir)
-        if args.get("add", False):
+        if args.add:
             _add(access)
         else:
             _search(access)
@@ -119,5 +125,5 @@ def main(args: Dict[str, str]) -> None:
 
 
 if __name__ == "__main__":
-    if app_args:
-        main(app_args)
+    app_args = _parse_args()
+    main(app_args)
