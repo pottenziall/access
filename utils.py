@@ -1,3 +1,9 @@
+#  Copyright (c) 2022-2023
+#  --------------------------------------------------------------------------
+#  Created By: Volodymyr Matsydin
+#  version ='1.0'
+#  -------------------------------------------------------------------------
+
 import json
 import logging
 import os
@@ -19,11 +25,11 @@ def validate_input(value: str, pattern: str) -> bool:
 def print_data(data: List[str]) -> None:
     if not data:
         data = ["no data"]
-    os.system(f'tput setaf 2')
+    os.system(f"tput setaf 2")
     for item in data[:-1]:
         _log.info(item + "\n")
     _log.info(data[-1])
-    os.system('tput setaf 7')
+    os.system("tput setaf 7")
     c = 0
     for i in data:
         c += len(i.split("\n"))

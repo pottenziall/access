@@ -1,3 +1,9 @@
+#  Copyright (c) 2022-2023
+#  --------------------------------------------------------------------------
+#  Created By: Volodymyr Matsydin
+#  version ='1.0'
+#  -------------------------------------------------------------------------
+
 import logging
 import os
 from pathlib import Path

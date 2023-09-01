@@ -1,3 +1,9 @@
+#  Copyright (c) 2022-2023
+#  --------------------------------------------------------------------------
+#  Created By: Volodymyr Matsydin
+#  version ='1.0'
+#  -------------------------------------------------------------------------
+
 import io
 import logging
 import os
@@ -174,7 +180,9 @@ class Access:
         )
         v_file.close()
         if not result.ok:
-            raise AssertionError(f"Encryption process failed with status: '{result.status}'")
+            raise AssertionError(
+                f"Encryption process failed with status: '{result.status}'"
+            )
         _log.info(f"Encrypted file successfully created: {archive_path}")
         return archive_path
 
