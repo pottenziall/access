@@ -10,7 +10,8 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from types import TracebackType
+from typing import List, Optional, Type
 
 import gnupg  # type: ignore
 
@@ -51,12 +52,12 @@ class Access:
     def __enter__(self) -> "Access":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
+    ) -> None:
         self.encrypt_and_export_to_new_file_if_content_updated()
 
-    def _recognize_and_work_with_path(
-        self, path: Path, passphrase: Optional[str] = None
-    ) -> None:
+    def _recognize_and_work_with_path(self, path: Path, passphrase: Optional[str] = None) -> None:
         """
         Recognize path:
             - search for encrypt files if is a dir
@@ -107,9 +108,7 @@ class Access:
         file_paths = [p for p in self.dir.iterdir() if p.name.endswith(self._ext)]
         if not file_paths:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
-        file_paths = sorted(
-            file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True
-        )
+        file_paths = sorted(file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True)
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:10]]
         _log.debug(f"First up to 10 files: {''.join(sorted_several_files)}" + "\n\t...")
         return file_paths
@@ -138,35 +137,25 @@ class Access:
             return ["<No content to search in>"]
         # TODO: improve search pattern
         pattern = f".{{,8}}{keyword.lower()}.*"
-        found = [
-            item
-            for item in self.__content.split(self._sep)
-            if re.match(pattern, item.lower())
-        ]
+        found = [item for item in self.__content.split(self._sep) if re.match(pattern, item.lower())]
         if not found:
             _log.info(f'Phrase "{keyword}" not found')
         return found
 
-    def encrypt_and_export_to_new_file_if_content_updated(
-        self, passphrase: Optional[str] = None
-    ) -> Optional[Path]:
+    def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
         """Encrypt updated content into a new file"""
         if not self._content_updated:
             _log.debug("Content has not been changed. Skip new file creation")
             return None
         _log.debug("Content has been changed. Creating new file...")
         content = self.__content.encode("utf8")
-        archive_path = self.encrypt_content_and_export_to_file(
-            content=content, passphrase=passphrase
-        )
+        archive_path = self.encrypt_content_and_export_to_file(content=content, passphrase=passphrase)
         del content
         self._content_updated = False
         self.archive_path = archive_path
         return archive_path
 
-    def encrypt_content_and_export_to_file(
-        self, content: bytes, passphrase: Optional[str] = None
-    ) -> Path:
+    def encrypt_content_and_export_to_file(self, content: bytes, passphrase: Optional[str] = None) -> Path:
         """Encrypt bytes content and export to a new file"""
         v_file = io.BytesIO(initial_bytes=content)
         del content
@@ -181,13 +170,11 @@ class Access:
         )
         v_file.close()
         if not result.ok:
-            raise AssertionError(
-                f"Encryption process failed with status: '{result.status}'"
-            )
+            raise AssertionError(f"Encryption process failed with status: '{result.status}'")
         _log.info(f"Encrypted file successfully created: {archive_path}")
         return archive_path
 
-    def _generate_file_path(self) -> Path:  # type: ignore
+    def _generate_file_path(self) -> Path:
         """Generate unique (within a folder) file name, based on current date
         for an encrypted file (e.g 'access_01012023_5')"""
         assert self.dir, "Dir path is not set"
@@ -198,9 +185,7 @@ class Access:
             path = self.dir / archive_name
             if not path.exists():
                 return path
-        raise RuntimeError(
-            "All possible file names already exist. Remove at least one old file"
-        )
+        raise RuntimeError("All possible file names already exist. Remove at least one old file")
 
     def add_content(self, new_content: str) -> None:
         """Add info to an existing content"""

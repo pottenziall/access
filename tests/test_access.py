@@ -25,7 +25,7 @@ _log = logging.getLogger(__name__)
 
 
 class TestInputPath:
-    def test_should_recognize_input_dir_path(self, tmp_path) -> None:
+    def test_should_recognize_input_dir_path(self, tmp_path: Path) -> None:
         empty_dir = tmp_path / "empty_dir"
         empty_dir.mkdir()
         access = Access(empty_dir)

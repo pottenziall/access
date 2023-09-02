@@ -107,7 +107,9 @@ def main(input_args: argparse.Namespace) -> None:
         else:
             config_content = utils.read_config(path=CONFIG_FILE_PATH)
             if config_content is not None and "work_dir" in config_content:
-                work_dir = Path(config_content["work_dir"])
+                work_dir_value = config_content["work_dir"]
+                assert isinstance(work_dir_value, str)
+                work_dir = Path(work_dir_value)
             else:
                 work_dir = APP_DIR
                 utils.add_to_config(

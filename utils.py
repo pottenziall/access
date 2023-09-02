@@ -10,9 +10,11 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 _log = logging.getLogger(__name__)
+
+JsonContent = Dict[str, Union[str, int]]
 
 
 def is_input_valid(value: str, pattern: str) -> bool:
@@ -37,15 +39,17 @@ def pretty_print(data: List[str]) -> None:
     os.system(f"tput cuu {c} && tput ed")
 
 
-def read_config(path: Path) -> Optional[Dict[str, Any]]:
+def read_config(path: Path) -> Optional[JsonContent]:
     if not path.is_file():
         _log.warning(f"Config file does not exist or is not a file: {path}")
         return None
     with open(path, encoding="utf8") as f:
-        return json.loads(f.read())
+        content = json.loads(f.read())
+        assert isinstance(content, dict)
+        return content
 
 
-def add_to_config(path: Path, data: Dict[str, Any]) -> None:
+def add_to_config(path: Path, data: Dict[str, Union[str, int]]) -> None:
     with open(path, "w+", encoding="utf-8") as f:
         content = json.load(f) if f.read() else {}
         content.update(data)
