@@ -7,11 +7,11 @@
 import logging
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import pytest
 
-from access.access_manager import Access
+from access.access_manager import Access, Credentials
 
 PRIVACY_ARCHIVE_EXAMPLE_PATH = Path("access_example_10032023.gpg")
 PRIVACY_ARCHIVE_CONTENT = "abc.com\nname1\npassword1\r\n\r\nxyz.com\nname2\npassword2"
@@ -22,6 +22,45 @@ UPDATE_TEXT_FILE_CONTENT = "third line of content"
 PASSPHRASE = "12345678"
 
 _log = logging.getLogger(__name__)
+
+
+class TestCredentials:
+    @pytest.mark.parametrize(
+        "credentials",
+        [
+            (["resource_1", "login_1", "password_1"],),
+            (["resource_2", "login_2", "password_2", "kind_2"],),
+        ],
+    )
+    def test_should_create_credentials_instance_with_valid_values(
+        self, credentials: Tuple[List[str]]
+    ) -> None:
+        params = credentials[0]
+        sut = Credentials(*params)
+        assert sut.resource == params[0]
+        assert sut.login == params[1]
+        assert sut.password == params[2]
+        if len(params) == 4:
+            assert sut.kind == params[3]
+
+    @pytest.mark.parametrize(
+        "wrong_credentials",
+        [
+            (["resou rce_1", "login_1", "password_1"],),
+            (["resource_1", "lo gin_1", "password_1"],),
+            (["resource_1", "login_1", "pas sword_1"],),
+        ],
+    )
+    def test_should_raise_exception_on_wrong_input_values(
+        self, wrong_credentials: Tuple[List[str]]
+    ) -> None:
+        with pytest.raises(RuntimeError):
+            params = wrong_credentials[0]
+            Credentials(*params)
+
+    def test_should_string_instance_properly(self) -> None:
+        sut = Credentials("resource_1", "login_1", "password_1", "kind_1")
+        assert str(sut) == "resource_1     kind_1     login_1     password_1"
 
 
 class TestInputPath:

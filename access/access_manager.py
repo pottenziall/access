@@ -8,10 +8,11 @@ import io
 import logging
 import os
 import re
+from dataclasses import dataclass, fields
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
-from typing import List, Optional, Type
+from typing import List, Optional, Set, Type
 
 import gnupg  # type: ignore
 
@@ -19,6 +20,40 @@ _log = logging.getLogger(__name__)
 
 PRIVACY_ARCHIVE_EXTENSION = "gpg"
 FILE_ITEMS_SEPARATOR = "\r\n\r\n"
+
+
+@dataclass(frozen=True)
+class Credentials:
+    resource: str
+    login: str
+    password: str
+    kind: str = "authentication"
+
+    def __post_init__(self) -> None:
+        for field in fields(self):
+            if getattr(self, field.name).count(" "):
+                raise RuntimeError(f"Field shouldn't contain spaces: '{field.name}'")
+
+    @classmethod
+    def from_file(cls, path: Path) -> Set["Credentials"]:
+        credentials = set()
+        with open(path, "r", encoding="utf8") as f:
+            for i, line in enumerate(f.readlines()):
+                if len(line.split()) > len(cls.__dataclass_fields__):
+                    _log.error(
+                        f"Invalid line {i+1} in the file {path}. Skip parsing the line"
+                    )
+                    continue
+                try:
+                    credentials.add(cls(*line.split()))
+                except RuntimeError:
+                    _log.error(
+                        f"A field contain spaces.  Skip creating instance for the set of values"
+                    )
+        return credentials
+
+    def __str__(self) -> str:
+        return f"{self.resource}{5*' '}{self.kind}{5*' '}{self.login}{5*' '}{self.password}"
 
 
 class Access:
@@ -53,11 +88,16 @@ class Access:
         return self
 
     def __exit__(
-        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         self.encrypt_and_export_to_new_file_if_content_updated()
 
-    def _recognize_and_work_with_path(self, path: Path, passphrase: Optional[str] = None) -> None:
+    def _recognize_and_work_with_path(
+        self, path: Path, passphrase: Optional[str] = None
+    ) -> None:
         """
         Recognize path:
             - search for encrypt files if is a dir
@@ -108,7 +148,9 @@ class Access:
         file_paths = [p for p in self.dir.iterdir() if p.name.endswith(self._ext)]
         if not file_paths:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
-        file_paths = sorted(file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True)
+        file_paths = sorted(
+            file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True
+        )
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:10]]
         _log.debug(f"First up to 10 files: {''.join(sorted_several_files)}" + "\n\t...")
         return file_paths
@@ -137,25 +179,35 @@ class Access:
             return ["<No content to search in>"]
         # TODO: improve search pattern
         pattern = f".{{,8}}{keyword.lower()}.*"
-        found = [item for item in self.__content.split(self._sep) if re.match(pattern, item.lower())]
+        found = [
+            item
+            for item in self.__content.split(self._sep)
+            if re.match(pattern, item.lower())
+        ]
         if not found:
             _log.info(f'Phrase "{keyword}" not found')
         return found
 
-    def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
+    def encrypt_and_export_to_new_file_if_content_updated(
+        self, passphrase: Optional[str] = None
+    ) -> Optional[Path]:
         """Encrypt updated content into a new file"""
         if not self._content_updated:
             _log.debug("Content has not been changed. Skip new file creation")
             return None
         _log.debug("Content has been changed. Creating new file...")
         content = self.__content.encode("utf8")
-        archive_path = self.encrypt_content_and_export_to_file(content=content, passphrase=passphrase)
+        archive_path = self.encrypt_content_and_export_to_file(
+            content=content, passphrase=passphrase
+        )
         del content
         self._content_updated = False
         self.archive_path = archive_path
         return archive_path
 
-    def encrypt_content_and_export_to_file(self, content: bytes, passphrase: Optional[str] = None) -> Path:
+    def encrypt_content_and_export_to_file(
+        self, content: bytes, passphrase: Optional[str] = None
+    ) -> Path:
         """Encrypt bytes content and export to a new file"""
         v_file = io.BytesIO(initial_bytes=content)
         del content
@@ -170,7 +222,9 @@ class Access:
         )
         v_file.close()
         if not result.ok:
-            raise AssertionError(f"Encryption process failed with status: '{result.status}'")
+            raise AssertionError(
+                f"Encryption process failed with status: '{result.status}'"
+            )
         _log.info(f"Encrypted file successfully created: {archive_path}")
         return archive_path
 
@@ -185,7 +239,9 @@ class Access:
             path = self.dir / archive_name
             if not path.exists():
                 return path
-        raise RuntimeError("All possible file names already exist. Remove at least one old file")
+        raise RuntimeError(
+            "All possible file names already exist. Remove at least one old file"
+        )
 
     def add_content(self, new_content: str) -> None:
         """Add info to an existing content"""
