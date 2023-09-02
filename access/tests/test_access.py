@@ -11,7 +11,7 @@ from typing import List
 
 import pytest
 
-from access import Access
+from access.access_manager import Access
 
 PRIVACY_ARCHIVE_EXAMPLE_PATH = Path("access_example_10032023.gpg")
 PRIVACY_ARCHIVE_CONTENT = "abc.com\nname1\npassword1\r\n\r\nxyz.com\nname2\npassword2"

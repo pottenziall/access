@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import utils
-from access import Access
+from access_manager import Access
 
 # TODO: error when wrong password
 DISPLAY_TIMEOUT = 20
