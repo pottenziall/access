@@ -15,14 +15,13 @@ from typing import Any, Dict, List, Optional
 _log = logging.getLogger(__name__)
 
 
-def validate_input(value: str, pattern: str) -> bool:
+def is_input_valid(value: str, pattern: str) -> bool:
     if re.match(pattern, value):
         return True
-    _log.info(f'Phrase "{value}" is not valid')
     return False
 
 
-def print_data(data: List[str]) -> None:
+def pretty_print(data: List[str]) -> None:
     if not data:
         data = ["no data"]
     os.system(f"tput setaf 2")
@@ -38,16 +37,6 @@ def print_data(data: List[str]) -> None:
     os.system(f"tput cuu {c} && tput ed")
 
 
-def clear_sensitives(path: Path, exclude: str) -> None:
-    _log.info("Clear sensitives...")
-    for directory, _, files in os.walk(path):
-        files_to_remove = [file for file in files if not file.endswith(f".{exclude}")]
-        if files_to_remove:
-            for file in files_to_remove:
-                os.remove(os.path.join(directory, file))
-            _log.debug(f"{len(files_to_remove)} files have been removed from {path}")
-
-
 def read_config(path: Path) -> Optional[Dict[str, Any]]:
     if not path.is_file():
         _log.warning(f"Config file does not exist or is not a file: {path}")
@@ -61,3 +50,4 @@ def add_to_config(path: Path, data: Dict[str, Any]) -> None:
         content = json.load(f) if f.read() else {}
         content.update(data)
         json.dump(content, f)
+    _log.debug(f"Added data to config file: {data}")

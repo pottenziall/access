@@ -23,11 +23,8 @@ SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9]{3,}$"
 ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
 _log = logging.getLogger("main")
-
 logging.basicConfig(
-    format="%(message)s",
-    level=logging.INFO,
-    handlers=[logging.StreamHandler()],
+    format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()]
 )
 
 
@@ -64,18 +61,15 @@ def _set_loggers_debug_level() -> None:
     for name in loggers:
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
-    # _log.setLevel(logging.DEBUG)
 
 
 def _search(access: Access) -> None:
-    # access = Access(DEFAULT_PRIVACY_DIR_PATH)
     while True:
-        # os.system("tput sc")
         _log.info("Type a phrase to search (min 3 ch):")
         value = _get_input_value()
-        if utils.validate_input(value=value, pattern=SEARCH_VALUE_PATTERN):
+        if utils.is_input_valid(value=value, pattern=SEARCH_VALUE_PATTERN):
             found = access.search_in_content(value)
-            utils.print_data(found)
+            utils.pretty_print(found)
 
 
 def _add(access: Access) -> None:
@@ -85,27 +79,34 @@ def _add(access: Access) -> None:
             _log.info(f"New credentials:")
             # TODO: Is case valid when cut input data after 30s?
             value = _get_input_value(timeout=60)
-            if utils.validate_input(value=value, pattern=ADDING_VALUE_PATTERN):
+            if utils.is_input_valid(value=value, pattern=ADDING_VALUE_PATTERN):
                 access.add_content(value)
+            else:
+                _log.info(f'Phrase "{value}" is not valid')
     except KeyboardInterrupt:
         access.encrypt_and_export_to_new_file_if_content_updated()
         raise
 
 
-def main(args: argparse.Namespace) -> None:
-    enabled_args = [a for a in vars(args) if vars(args)[a]]
+def main(input_args: argparse.Namespace) -> None:
+    args_dict = vars(input_args)
+    enabled_args = [arg for arg in args_dict if args_dict[arg]]
     if enabled_args:
-        _log.info(f"Run app with args: {enabled_args}")
+        _log.info(f"Run app with arguments: {enabled_args}")
+
     try:
-        if args.debug:
+        if input_args.debug:
             _set_loggers_debug_level()
             _log.info("Debug mode enabled")
-        if args.work_dir:
-            work_dir = Path(args.work_dir)
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": args.work_dir})
+
+        if input_args.work_dir:
+            work_dir = Path(input_args.work_dir)
+            utils.add_to_config(
+                path=CONFIG_FILE_PATH, data={"work_dir": input_args.work_dir}
+            )
         else:
             config_content = utils.read_config(path=CONFIG_FILE_PATH)
-            if config_content and "work_dir" in config_content:
+            if config_content is not None and "work_dir" in config_content:
                 work_dir = Path(config_content["work_dir"])
             else:
                 work_dir = APP_DIR
@@ -113,7 +114,8 @@ def main(args: argparse.Namespace) -> None:
                     path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)}
                 )
         access = Access(work_dir)
-        if args.add:
+
+        if input_args.add:
             _add(access)
         else:
             _search(access)
@@ -126,7 +128,6 @@ def main(args: argparse.Namespace) -> None:
         os.system("tput rc && tput rc && tput ed")
         sys.exit(1)
     finally:
-        # utils.clear_sensitives(DEFAULT_PRIVACY_DIR_PATH, exclude=APP)
         _log.info("Application closed")
 
 

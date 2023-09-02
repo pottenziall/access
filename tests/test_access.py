@@ -25,30 +25,26 @@ _log = logging.getLogger(__name__)
 
 
 class TestInputPath:
-    @staticmethod
-    def test_should_recognize_input_dir_path(tmp_path) -> None:
+    def test_should_recognize_input_dir_path(self, tmp_path) -> None:
         empty_dir = tmp_path / "empty_dir"
         empty_dir.mkdir()
         access = Access(empty_dir)
         assert access.dir == empty_dir
         assert access.archive_path is None
 
-    @staticmethod
-    def test_should_recognize_input_encrypted_file_path() -> None:
+    def test_should_recognize_input_encrypted_file_path(self) -> None:
         path = PRIVACY_ARCHIVE_EXAMPLE_PATH
         access = Access(path, passphrase=PASSPHRASE)
         assert access.dir == path.parent
         assert access.archive_path == path
 
-    @staticmethod
     @pytest.mark.parametrize("path", ["/wrong/dir/path", "/wrong/file/path.txt"])
-    def test_should_raise_assertion_error_on_wrong_path(path: str) -> None:
+    def test_should_raise_assertion_error_on_wrong_path(self, path: str) -> None:
         with pytest.raises(AssertionError):
             Access(Path(path))
 
 
 class TestAccess:
-    @staticmethod
     @pytest.mark.parametrize(
         "keyword, result",
         [
@@ -57,14 +53,13 @@ class TestAccess:
         ],
     )
     def test_should_find_proper_result_for_keyword(
-        keyword: str, result: List[str]
+        self, keyword: str, result: List[str]
     ) -> None:
         with Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE) as access:
             found = access.search_in_content(keyword)
             assert found == result
 
-    @staticmethod
-    def test_pack_updated_content_of_existing_archive_to_new_archive() -> None:
+    def test_pack_updated_content_of_existing_archive_to_new_archive(self) -> None:
         access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE)
         access.add_content(UPDATE_PRIVACY_ARCHIVE_CONTENT)
         access.encrypt_and_export_to_new_file_if_content_updated(passphrase=PASSPHRASE)
@@ -75,8 +70,7 @@ class TestAccess:
         assert new_access.archive_path is not None
         os.remove(new_access.archive_path)
 
-    @staticmethod
-    def test_pack_updated_content_of_text_file_to_new_archive() -> None:
+    def test_pack_updated_content_of_text_file_to_new_archive(self) -> None:
         access = Access(TEXT_FILE_EXAMPLE_PATH, passphrase=PASSPHRASE)
         access.add_content(UPDATE_TEXT_FILE_CONTENT)
         access.encrypt_and_export_to_new_file_if_content_updated(passphrase=PASSPHRASE)

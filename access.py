@@ -126,6 +126,7 @@ class Access:
             _log.error("Wrong password")
             raise AssertionError("Wrong password")
         self.archive_path = path
+        # TODO: use dataclass for credential items
         self.__content = result.data.decode("utf8")
         _log.debug(f"Got content of {path}")
         del result
