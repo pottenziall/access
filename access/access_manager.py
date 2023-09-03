@@ -8,13 +8,13 @@ import io
 import logging
 import os
 import re
-from dataclasses import dataclass, fields
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import List, Optional, Set, Type
 
 import gnupg  # type: ignore
+from dataclasses import dataclass, fields
 
 _log = logging.getLogger(__name__)
 
@@ -44,9 +44,7 @@ class Credentials:
             try:
                 credentials.add(cls(*line.split()))
             except RuntimeError:
-                _log.error(
-                    f"A field contain spaces. Skip creating instance for the values"
-                )
+                _log.error(f"A field contain spaces in line {i + 1}. Skip creating instance for the values")
         return credentials
 
     @classmethod
@@ -97,9 +95,7 @@ class Access:
     ) -> None:
         self.encrypt_and_export_to_new_file_if_content_updated()
 
-    def _recognize_and_work_with_path(
-        self, path: Path, passphrase: Optional[str] = None
-    ) -> None:
+    def _recognize_and_work_with_path(self, path: Path, passphrase: Optional[str] = None) -> None:
         """
         Recognize path:
             - search for encrypt files if is a dir
@@ -139,16 +135,15 @@ class Access:
         _log.info(f"Latest encrypted file: {latest_file_path}")
         return latest_file_path
 
-    def _get_sorted_files_by_date_desc(self) -> List[Path]:
+    def _get_sorted_files_by_date_desc(self) -> Optional[List[Path]]:
         """Search in a directory for files with "self._ext" extension"""
         assert self.dir, "Dir path is not set"
         _log.debug(f'Search for "{self._ext}" files in {self.dir}...')
         file_paths = [p for p in self.dir.iterdir() if p.name.endswith(self._ext)]
         if not file_paths:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
-        file_paths = sorted(
-            file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True
-        )
+            return None
+        file_paths = sorted(file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True)
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:10]]
         _log.debug(f"First up to 10 files: {''.join(sorted_several_files)}" + "\n\t...")
         return file_paths
@@ -177,26 +172,18 @@ class Access:
         # TODO: improve search pattern
         pattern = f".*{keyword.lower()}.*"
         # search in 'resource' field only
-        found = {
-            credentials
-            for credentials in self.__credentials
-            if re.match(pattern, credentials.resource)
-        }
+        found = {credentials for credentials in self.__credentials if re.match(pattern, credentials.resource)}
         if not found:
             _log.info(f'Phrase "{keyword}" not found')
         return found
 
-    def encrypt_and_export_to_new_file_if_content_updated(
-        self, passphrase: Optional[str] = None
-    ) -> Optional[Path]:
+    def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
         """Encrypt updated content into a new file"""
         if not self._content_updated:
             _log.debug("Content has not been changed. Skip new file creation")
             return None
         _log.debug("Content has been changed. Creating new archive file...")
-        content_string = FILE_ITEMS_SEPARATOR.join(
-            [c.as_line() for c in self.__credentials]
-        )
+        content_string = FILE_ITEMS_SEPARATOR.join([c.as_line() for c in self.__credentials])
         archive_path = self.encrypt_content_and_export_to_file(
             content=content_string.encode("utf8"), passphrase=passphrase
         )
@@ -205,9 +192,7 @@ class Access:
         self.archive_path = archive_path
         return archive_path
 
-    def encrypt_content_and_export_to_file(
-        self, content: bytes, passphrase: Optional[str] = None
-    ) -> Path:
+    def encrypt_content_and_export_to_file(self, content: bytes, passphrase: Optional[str] = None) -> Path:
         """Encrypt bytes content and export to a new file"""
         v_file = io.BytesIO(initial_bytes=content)
         del content
@@ -222,9 +207,7 @@ class Access:
         )
         v_file.close()
         if not result.ok:
-            raise AssertionError(
-                f"Encryption process failed with status: '{result.status}'"
-            )
+            raise AssertionError(f"Encryption process failed with status: '{result.status}'")
         _log.info(f"Encrypted file successfully created: {archive_path}")
         return archive_path
 
@@ -239,9 +222,7 @@ class Access:
             path = self.dir / archive_name
             if not path.exists():
                 return path
-        raise RuntimeError(
-            "All possible file names already exist. Remove at least one old file"
-        )
+        raise RuntimeError("All possible file names already exist. Remove at least one old file")
 
     def add_content(self, new_content: str) -> None:
         """Add credentials to an existing content"""

@@ -32,9 +32,7 @@ class TestCredentials:
             (["resource_2", "login_2", "password_2", "kind_2"],),
         ],
     )
-    def test_should_create_credentials_instance_with_valid_values(
-        self, credentials: Tuple[List[str]]
-    ) -> None:
+    def test_should_create_credentials_instance_with_valid_values(self, credentials: Tuple[List[str]]) -> None:
         params = credentials[0]
         sut = Credentials(*params)
         assert sut.resource == params[0]
@@ -51,9 +49,7 @@ class TestCredentials:
             (["resource_1", "login_1", "pas sword_1"],),
         ],
     )
-    def test_should_raise_exception_on_wrong_input_values(
-        self, wrong_credentials: Tuple[List[str]]
-    ) -> None:
+    def test_should_raise_exception_on_wrong_input_values(self, wrong_credentials: Tuple[List[str]]) -> None:
         with pytest.raises(RuntimeError):
             params = wrong_credentials[0]
             Credentials(*params)
@@ -91,9 +87,7 @@ class TestAccess:
             ("resource_2", CREDENTIALS_2),
         ],
     )
-    def test_should_find_proper_result_for_keyword(
-        self, keyword: str, result: str
-    ) -> None:
+    def test_should_find_proper_result_for_keyword(self, keyword: str, result: str) -> None:
         resource, login, password = result.split()
         with Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE) as access:
             found = access.search_in_content(keyword)
@@ -120,7 +114,6 @@ class TestAccess:
         for line in CONTENT.splitlines() + [UPDATE_CONTENT]:
             resource, login, password = line.split()
             found = new_access.search_in_content(keyword=resource)
-            resource, login, password = line.split()
             assert found == {Credentials(resource, login, password)}
 
         assert new_access.archive_path is not None

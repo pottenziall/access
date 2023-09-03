@@ -19,19 +19,16 @@ DISPLAY_TIMEOUT = 20
 APP_DIR = Path(f"{__file__}").parent
 CONFIG_FILE_PATH = APP_DIR / "config"
 APP = "gpg"
+# TODO: adapt the pattern to allow "."
 SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9]{3,}$"
 ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
 _log = logging.getLogger("main")
-logging.basicConfig(
-    format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()]
-)
+logging.basicConfig(format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Search for credentials in an encrypted archive"
-    )
+    parser = argparse.ArgumentParser(description="Search for credentials in an encrypted archive")
     parser.add_argument(
         "--add",
         help="Add credentials and save it in a new archive",
@@ -54,13 +51,6 @@ def _get_input_value(timeout: int = 30) -> str:
         return sys.stdin.readline().strip().lower()
     _log.info("Timeout reached, closing the application...")
     raise KeyboardInterrupt
-
-
-def _set_loggers_debug_level() -> None:
-    loggers = ["main", "utils", "access"]
-    for name in loggers:
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)
 
 
 def _search(access: Access) -> None:
@@ -96,14 +86,13 @@ def main(input_args: argparse.Namespace) -> None:
 
     try:
         if input_args.debug:
-            _set_loggers_debug_level()
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.DEBUG)
             _log.info("Debug mode enabled")
 
         if input_args.work_dir:
             work_dir = Path(input_args.work_dir)
-            utils.add_to_config(
-                path=CONFIG_FILE_PATH, data={"work_dir": input_args.work_dir}
-            )
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": input_args.work_dir})
         else:
             config_content = utils.read_config(path=CONFIG_FILE_PATH)
             if config_content is not None and "work_dir" in config_content:
@@ -112,18 +101,17 @@ def main(input_args: argparse.Namespace) -> None:
                 work_dir = Path(work_dir_value)
             else:
                 work_dir = APP_DIR
-                utils.add_to_config(
-                    path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)}
-                )
+                utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_dir)})
         access = Access(work_dir)
 
         if input_args.add:
             _add(access)
         else:
-            _search(access)
-    except Exception:
+            if access.archive_path is not None:
+                _search(access)
+    except Exception as e:
         if _log.level == 0:
-            _log.error("Program failed")
+            _log.error(f"Program failed: {e}")
         else:
             _log.exception("Program failed:")
     except KeyboardInterrupt:

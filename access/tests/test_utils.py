@@ -29,8 +29,6 @@ def tmp_file(tmp_path: Path) -> Path:
     return file_path
 
 
-@pytest.mark.parametrize(
-    "word, pattern, result", [("ABc1", r"\w{3}\d", True), ("ABCD", r"\d{4}", False)]
-)
+@pytest.mark.parametrize("word, pattern, result", [("ABc1", r"\w{3}\d", True), ("ABCD", r"\d{4}", False)])
 def test_is_valid(word: str, pattern: str, result: bool) -> None:
     assert utils.is_input_valid(value=word, pattern=pattern) == result
