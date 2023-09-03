@@ -19,7 +19,7 @@ import gnupg  # type: ignore
 _log = logging.getLogger(__name__)
 
 PRIVACY_ARCHIVE_EXTENSION = "gpg"
-FILE_ITEMS_SEPARATOR = "\r\n\r\n"
+FILE_ITEMS_SEPARATOR = "\n"
 
 
 @dataclass(frozen=True)
@@ -35,22 +35,27 @@ class Credentials:
                 raise RuntimeError(f"Field shouldn't contain spaces: '{field.name}'")
 
     @classmethod
-    def from_file(cls, path: Path) -> Set["Credentials"]:
+    def from_string(cls, string_value: str) -> Set["Credentials"]:
         credentials = set()
-        with open(path, "r", encoding="utf8") as f:
-            for i, line in enumerate(f.readlines()):
-                if len(line.split()) > len(cls.__dataclass_fields__):
-                    _log.error(
-                        f"Invalid line {i+1} in the file {path}. Skip parsing the line"
-                    )
-                    continue
-                try:
-                    credentials.add(cls(*line.split()))
-                except RuntimeError:
-                    _log.error(
-                        f"A field contain spaces.  Skip creating instance for the set of values"
-                    )
+        for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR)):
+            if len(line.split()) > len(cls.__dataclass_fields__):
+                _log.error(f"Invalid line {i+1}. Skip parsing the line")
+                continue
+            try:
+                credentials.add(cls(*line.split()))
+            except RuntimeError:
+                _log.error(
+                    f"A field contain spaces. Skip creating instance for the values"
+                )
         return credentials
+
+    @classmethod
+    def from_file(cls, path: Path) -> Set["Credentials"]:
+        with open(path, "r", encoding="utf8") as f:
+            return cls.from_string(f.read())
+
+    def as_line(self) -> str:
+        return f"{self.resource} {self.login} {self.password} {self.kind}"
 
     def __str__(self) -> str:
         return f"{self.resource}{5*' '}{self.kind}{5*' '}{self.login}{5*' '}{self.password}"
@@ -65,7 +70,6 @@ class Access:
     :param path: either path to an encrypted file or a directory that will be used as working directory
     :param passphrase: if provided, a modal window for input a passphrase won't appear (useful for testing)
     :param extension: file extension that the class works with
-    :param separator: separator for info sets in an encrypted file content
     """
 
     def __init__(
@@ -73,13 +77,11 @@ class Access:
         path: Path,
         passphrase: Optional[str] = None,
         extension: str = PRIVACY_ARCHIVE_EXTENSION,
-        separator: str = FILE_ITEMS_SEPARATOR,
     ) -> None:
         self.dir: Optional[Path] = None
         self.archive_path: Optional[Path] = None
         self._ext: str = extension
-        self._sep: str = separator
-        self.__content: str = ""
+        self.__credentials: Set[Credentials] = set()
         self._content_updated: bool = False
         self._gpg = gnupg.GPG()  # verbose=True)
         self._recognize_and_work_with_path(path=path, passphrase=passphrase)
@@ -117,12 +119,8 @@ class Access:
             raise AssertionError(f"Wrong path passed: {path}")
 
     def _read_file(self, path: Path) -> None:
-        try:
-            with open(path, "r", encoding="utf8") as f:
-                self.__content = f.read().replace("\n", self._sep)
-                _log.debug(f"Got content of the file: {path}")
-        except Exception:
-            _log.error(f"Unable to read the text file: {path}. Skip reading")
+        self.__credentials = Credentials.from_file(path)
+        _log.debug(f"Got content of the file: {path}")
 
     def _find_and_decrypt_file(self, passphrase: Optional[str] = None) -> None:
         archive_path = self.find_latest_file()
@@ -167,23 +165,23 @@ class Access:
             _log.error("Wrong password")
             raise AssertionError("Wrong password")
         self.archive_path = path
-        # TODO: use dataclass for credential items
-        self.__content = result.data.decode("utf8")
-        _log.debug(f"Got content of {path}")
+        self.__credentials = Credentials.from_string(result.data.decode("utf8"))
+        _log.debug(f"Got content of the file: {path}")
         del result
 
-    def search_in_content(self, keyword: str) -> List[str]:
+    def search_in_content(self, keyword: str) -> Set[Credentials]:
         """Search for 'keyword' within decrypted file content"""
-        if not self.__content:
-            _log.error("File content is empty")
-            return ["<No content to search in>"]
+        if not self.__credentials:
+            _log.error("No content to search in")
+            return set()
         # TODO: improve search pattern
-        pattern = f".{{,8}}{keyword.lower()}.*"
-        found = [
-            item
-            for item in self.__content.split(self._sep)
-            if re.match(pattern, item.lower())
-        ]
+        pattern = f".*{keyword.lower()}.*"
+        # search in 'resource' field only
+        found = {
+            credentials
+            for credentials in self.__credentials
+            if re.match(pattern, credentials.resource)
+        }
         if not found:
             _log.info(f'Phrase "{keyword}" not found')
         return found
@@ -195,12 +193,14 @@ class Access:
         if not self._content_updated:
             _log.debug("Content has not been changed. Skip new file creation")
             return None
-        _log.debug("Content has been changed. Creating new file...")
-        content = self.__content.encode("utf8")
-        archive_path = self.encrypt_content_and_export_to_file(
-            content=content, passphrase=passphrase
+        _log.debug("Content has been changed. Creating new archive file...")
+        content_string = FILE_ITEMS_SEPARATOR.join(
+            [c.as_line() for c in self.__credentials]
         )
-        del content
+        archive_path = self.encrypt_content_and_export_to_file(
+            content=content_string.encode("utf8"), passphrase=passphrase
+        )
+        del content_string
         self._content_updated = False
         self.archive_path = archive_path
         return archive_path
@@ -244,9 +244,7 @@ class Access:
         )
 
     def add_content(self, new_content: str) -> None:
-        """Add info to an existing content"""
-        if not self.__content.endswith(self._sep):
-            self.__content += self._sep
-        self.__content = self.__content + new_content
+        """Add credentials to an existing content"""
+        self.__credentials.update(Credentials.from_string(new_content))
         self._content_updated = True
         _log.debug("New content added to list")

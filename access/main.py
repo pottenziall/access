@@ -69,7 +69,7 @@ def _search(access: Access) -> None:
         value = _get_input_value()
         if utils.is_input_valid(value=value, pattern=SEARCH_VALUE_PATTERN):
             found = access.search_in_content(value)
-            utils.pretty_print(found)
+            utils.pretty_print([str(item) for item in found])
 
 
 def _add(access: Access) -> None:
