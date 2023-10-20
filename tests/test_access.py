@@ -1,11 +1,12 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.1'
+#  version ='1.0.2'
 #  -------------------------------------------------------------------------
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import List, Tuple
 
@@ -80,6 +81,18 @@ class TestInputPath:
 
 
 class TestAccess:
+    def test_should_select_latest_encrypted_archive_from_list_of_ones(  # type: ignore
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        access = Access(tmp_path)
+        files_names = ["dummy_1.gpg", "dummy_2.gpg", "dummy_3.gpg", "dummy_4.gpg", "dummy_5.gpg"]
+        for name in files_names:
+            p = tmp_path / name
+            p.write_text("dummy content")
+            time.sleep(0.1)
+        assert len(list(tmp_path.iterdir())) == len(files_names)
+        assert access.find_latest_file() == tmp_path / files_names[-1]
+
     @pytest.mark.parametrize(
         "keyword, result",
         [
