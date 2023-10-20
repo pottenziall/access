@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.1'
+#  version ='1.0.2'
 #  -------------------------------------------------------------------------
 
 import io
@@ -38,7 +38,7 @@ class Credentials:
     def from_string(cls, string_value: str) -> Set["Credentials"]:
         credentials = set()
         for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR)):
-            if len(line.split()) > len(cls.__dataclass_fields__):
+            if len(line.split()) > len(fields(cls)):
                 _log.error(f"Invalid line {i + 1}. Skip parsing the line")
                 continue
             try:
@@ -169,7 +169,6 @@ class Access:
         if not self.__credentials:
             _log.error("No content to search in")
             return set()
-        # TODO: improve search pattern
         pattern = f".*{keyword.lower()}.*"
         # search in 'resource' field only
         found = {credentials for credentials in self.__credentials if re.match(pattern, credentials.resource)}

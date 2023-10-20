@@ -3,7 +3,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.1'
+#  version ='1.0.2'
 #  -------------------------------------------------------------------------
 
 import argparse
@@ -19,10 +19,9 @@ from src.access_manager import Access
 # TODO: error when wrong password
 DISPLAY_TIMEOUT = 20
 APP_DIR = Path(f"{__file__}").parent
-CONFIG_FILE_PATH = APP_DIR / "config"
+CONFIG_FILE_PATH = APP_DIR / "config.conf"
 APP = "gpg"
-# TODO: adapt the pattern to allow "."
-SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9]{3,}$"
+SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9.]{3,}$"
 ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
 _log = logging.getLogger("main")
@@ -39,7 +38,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-w",
         "--work_dir",
-        help="Work directory, otherwise - default path will be used. The path will be stored in config file",
+        help="Work directory, otherwise - default path will be used. The path will be stored in config.conf file",
     )
     parser.add_argument("-d", "--debug", help="Enable debug mode", action="store_true")
     return parser.parse_args()
@@ -65,11 +64,10 @@ def _search(access: Access) -> None:
 
 
 def _add(access: Access) -> None:
-    _log.info(f"Please, enter credentials, like gmail.com mylogin 12345678)")
+    _log.info(f"Please, enter credentials, like 'gmail.com mylogin 12345678 authentication'. The last is default")
     try:
         while True:
             _log.info(f"New credentials:")
-            # TODO: Is case valid when cut input data after 30s?
             value = _get_input_value(timeout=60)
             if utils.is_input_valid(value=value, pattern=ADDING_VALUE_PATTERN):
                 access.add_content(value)
@@ -120,6 +118,7 @@ def main(input_args: argparse.Namespace) -> None:
         os.system("tput rc && tput rc && tput ed")
         sys.exit(1)
     finally:
+        # TODO: clear screen finally
         _log.info("Application closed")
 
 
