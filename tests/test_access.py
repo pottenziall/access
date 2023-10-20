@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0'
+#  version ='1.0.1'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -11,7 +11,7 @@ from typing import List, Tuple
 
 import pytest
 
-from access.access_manager import Access, Credentials
+from src.access_manager import Access, Credentials
 
 PRIVACY_ARCHIVE_EXAMPLE_PATH = Path("encrypted_archive_example.gpg")
 TEXT_FILE_EXAMPLE_PATH = Path("text_file_example.txt")

@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0'
+#  version ='1.0.1'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from access import utils
+import src.utils as utils
 
 _log = logging.getLogger(__name__)
 

@@ -1,7 +1,9 @@
+#!/usr/bin/python3
+
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0'
+#  version ='1.0.1'
 #  -------------------------------------------------------------------------
 
 import argparse
@@ -11,8 +13,8 @@ import select
 import sys
 from pathlib import Path
 
-import utils
-from access_manager import Access
+from src import utils
+from src.access_manager import Access
 
 # TODO: error when wrong password
 DISPLAY_TIMEOUT = 20

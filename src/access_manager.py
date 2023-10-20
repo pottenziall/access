@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0'
+#  version ='1.0.1'
 #  -------------------------------------------------------------------------
 
 import io
@@ -39,7 +39,7 @@ class Credentials:
         credentials = set()
         for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR)):
             if len(line.split()) > len(cls.__dataclass_fields__):
-                _log.error(f"Invalid line {i+1}. Skip parsing the line")
+                _log.error(f"Invalid line {i + 1}. Skip parsing the line")
                 continue
             try:
                 credentials.add(cls(*line.split()))
@@ -56,7 +56,7 @@ class Credentials:
         return f"{self.resource} {self.login} {self.password} {self.kind}"
 
     def __str__(self) -> str:
-        return f"{self.resource}{5*' '}{self.kind}{5*' '}{self.login}{5*' '}{self.password}"
+        return f"{self.resource}{5 * ' '}{self.kind}{5 * ' '}{self.login}{5 * ' '}{self.password}"
 
 
 class Access:
