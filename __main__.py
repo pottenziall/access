@@ -24,6 +24,7 @@ ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 
 _log = logging.getLogger("main")
 logging.basicConfig(format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
+# TODO: create a function: run_in_safe_cycle
 
 
 def _parse_args() -> argparse.Namespace:
@@ -31,7 +32,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-a",
         "--add",
-        help="Update the existing credential base and save it in a new archive",
+        help="Update the existing credential base and save it into a new archive",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-r",
+        "--remove",
+        help="Remove credentials from the base and save the base into a new archive",
         action="store_true",
     )
     parser.add_argument(
@@ -47,6 +54,7 @@ def _parse_args() -> argparse.Namespace:
 
 def _get_input_value(timeout: int = 30) -> str:
     while True:
+        # TODO: improve the method
         inp, o, e = select.select([sys.stdin], [], [], timeout)
         if not inp:
             break
@@ -83,6 +91,37 @@ def _add(access: Access) -> None:
         raise
 
 
+def _remove(access: Access) -> None:
+    lines_to_remove = 0
+    try:
+        while True:
+            _log.info(f"Please input credentials pattern to remove")
+            pattern = _get_input_value(timeout=60)
+            if not pattern:
+                continue
+            found = access.search_in_content(pattern=pattern)
+            if not found:
+                continue
+            found_elements = [f"\n\t{str(c)}\n" for c in found]
+            _log.info(f"Found {len(found)} credentials for the pattern '{pattern}': ")
+            os.system("tput setaf 1")
+            _log.info(f"{''.join(found_elements)}")
+            lines_to_remove = len(found)
+            os.system("tput setaf 7")
+            # TODO: use timeout
+            is_accepted = input("Enter 'yes' to remove or any key to cancel: ")
+
+            if is_accepted == "yes":
+                access.remove_credentials(pattern=pattern)
+            else:
+                _log.info("Skip removing")
+            os.system(f"echo -en '\033[{2 * len(found) + 4}A' && tput ed")
+    finally:
+        if lines_to_remove:
+            os.system(f"echo -en '\033[{2 * lines_to_remove + 4}A' && tput ed")
+        access.encrypt_and_export_to_new_file_if_content_updated()
+
+
 def _set_debug_mode() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
@@ -105,6 +144,8 @@ def main() -> None:
 
         if input_args.add:
             _add(access)
+        elif input_args.remove:
+            _remove(access)
         else:
             if access.archive_path is None:
                 _log.warning("No encrypted archive found to search in")

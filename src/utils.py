@@ -23,7 +23,7 @@ def is_input_valid(value: str, pattern: str) -> bool:
 
 
 def short_show(data: List[str], timeout: int = 5) -> None:
-    os.system(f"tput setaf 2")
+    os.system("tput setaf 2")
     lines = "\n".join(data)
     os.system(f"echo $'{lines}' | timeout --foreground {timeout} less -e")
     os.system("tput setaf 7")

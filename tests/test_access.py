@@ -113,7 +113,7 @@ class TestAccess:
 
         new_access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH.parent, passphrase=PASSPHRASE)
         resource, login, password = UPDATE_CONTENT.split()
-        found = new_access.search_in_content(keyword=resource)
+        found = new_access.search_in_content(pattern=resource)
         assert found == {Credentials(resource, login, password)}
         assert new_access.archive_path is not None
         os.remove(new_access.archive_path)
@@ -126,8 +126,19 @@ class TestAccess:
         new_access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH.parent, passphrase=PASSPHRASE)
         for line in CONTENT.splitlines() + [UPDATE_CONTENT]:
             resource, login, password = line.split()
-            found = new_access.search_in_content(keyword=resource)
+            found = new_access.search_in_content(pattern=resource)
             assert found == {Credentials(resource, login, password)}
 
         assert new_access.archive_path is not None
         os.remove(new_access.archive_path)
+
+    def test_should_remove_credentials_for_the_pattern(self) -> None:
+        access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE)
+        pattern = "resource"
+        exist = access.search_in_content(pattern=pattern)
+        assert len(exist) == 2
+        access.remove_credentials(pattern=pattern)
+
+        exist = access.search_in_content(pattern=pattern)
+        assert len(exist) == 0
+

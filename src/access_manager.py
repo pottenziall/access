@@ -164,16 +164,14 @@ class Access:
         _log.debug(f"Got content of the file: {path}")
         del result
 
-    def search_in_content(self, keyword: str) -> Set[Credentials]:
+    def search_in_content(self, pattern: str) -> Set[Credentials]:
         """Search for 'keyword' within decrypted file content"""
         if not self.__credentials:
             _log.error("No content to search in")
             return set()
-        pattern = f".*{keyword.lower()}.*"
-        # search in 'resource' field only
-        found = {credentials for credentials in self.__credentials if re.match(pattern, credentials.resource)}
+        found = {credentials for credentials in self.__credentials if re.search(pattern, str(credentials))}
         if not found:
-            _log.info(f'Phrase "{keyword}" not found')
+            _log.info(f'No credential found for the pattern "{pattern}"')
         return found
 
     def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
@@ -228,3 +226,12 @@ class Access:
         self.__credentials.update(Credentials.from_string(new_content))
         self._content_updated = True
         _log.debug("New content added to list")
+
+    def remove_credentials(self, pattern: str) -> None:
+        if not pattern:
+            _log.warning("Please provide a pattern to remove credentials")
+            return
+        found = self.search_in_content(pattern)
+        self.__credentials = self.__credentials - found
+        self._content_updated = True
+        _log.info(f"{len(found)} items removed successfully")
