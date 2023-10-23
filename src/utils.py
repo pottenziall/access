@@ -19,6 +19,7 @@ JsonContent = Dict[str, Union[str, int]]
 def is_input_valid(value: str, pattern: str) -> bool:
     if re.match(pattern, value):
         return True
+    _log.info(f'Input phrase is not valid')
     return False
 
 

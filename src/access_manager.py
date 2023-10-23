@@ -32,7 +32,7 @@ class Credentials:
     def __post_init__(self) -> None:
         for field in fields(self):
             if getattr(self, field.name).count(" "):
-                raise RuntimeError(f"Field shouldn't contain spaces: '{field.name}'")
+                raise ValueError(f"Field '{field.name}' shouldn't contain spaces")
 
     @classmethod
     def from_string(cls, string_value: str) -> Set["Credentials"]:
@@ -112,7 +112,7 @@ class Access:
             self.dir = path
             self._find_and_decrypt_file(passphrase=passphrase)
         else:
-            raise AssertionError(f"Wrong path passed: {path}")
+            raise ValueError(f"Wrong path passed: {path}")
 
     def _read_file(self, path: Path) -> None:
         self.__credentials = Credentials.from_file(path)
@@ -151,14 +151,14 @@ class Access:
     def decrypt_file(self, path: Path, passphrase: Optional[str] = None) -> None:
         """Decrypt a file either with 'passphrase' or with modal window"""
         if not path.is_file():
-            raise AssertionError(f"Path is not a file: {path}")
+            raise ValueError(f"Path is not a file: {path}")
         if not path.name.endswith(self._ext):
-            raise AssertionError(f'File must be a "{self._ext}" file but got: {path}')
+            raise ValueError(f'File must be a "{self._ext}" file but got: {path}')
         _log.debug(f"Decrypting {path}...")
         result = self._gpg.decrypt_file(str(path), passphrase=passphrase)
         if not result.ok:
             _log.error("Wrong password")
-            raise AssertionError("Wrong password")
+            raise ValueError("Wrong password")
         self.archive_path = path
         self.__credentials = Credentials.from_string(result.data.decode("utf8"))
         _log.debug(f"Got content of the file: {path}")
@@ -204,7 +204,7 @@ class Access:
         )
         v_file.close()
         if not result.ok:
-            raise AssertionError(f"Encryption process failed with status: '{result.status}'")
+            raise RuntimeError(f"Encryption process failed with status: '{result.status}'")
         _log.info(f"Encrypted file successfully created: {archive_path}")
         return archive_path
 

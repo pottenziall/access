@@ -11,7 +11,6 @@ import logging
 import os
 import select
 import sys
-import time
 from pathlib import Path
 
 from src import utils
@@ -25,6 +24,11 @@ ADDING_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}$"
 _log = logging.getLogger("main")
 logging.basicConfig(format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
 # TODO: create a function: run_in_safe_cycle
+
+
+class GetInputTimedOut(Exception):
+    def __init__(self) -> None:
+        super().__init__("Timeout reached when waiting for input value")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -57,8 +61,7 @@ def _get_input_value(text: str, timeout: int = 30) -> str:
     input_value, _, _ = select.select([sys.stdin], [], [], timeout)
     if input_value:
         return sys.stdin.readline().strip().lower()
-    _log.info("Timeout reached, closing the application...")
-    raise KeyboardInterrupt
+    raise GetInputTimedOut
 
 
 def _search(access: Access) -> None:
@@ -69,24 +72,17 @@ def _search(access: Access) -> None:
             found = access.search_in_content(value)
             if found:
                 utils.short_show([str(item) for item in found])
-                time.sleep(5)
 
 
 def _add(access: Access) -> None:
     _log.info(f"Please, enter credentials, like 'gmail.com mylogin 12345678 authentication'. The last is default")
-    try:
-        while True:
-            os.system("tput sc")
-            input_message = "New credentials:"
-            value = _get_input_value(input_message, timeout=60)
-            os.system("tput rc && tput ed")
-            if utils.is_input_valid(value=value, pattern=ADDING_VALUE_PATTERN):
-                access.add_content(value)
-            else:
-                _log.info(f'Input phrase is not valid')
-    except KeyboardInterrupt:
-        access.encrypt_and_export_to_new_file_if_content_updated()
-        raise
+    while True:
+        os.system("tput sc")
+        input_message = "New credentials:"
+        value = _get_input_value(input_message, timeout=60)
+        os.system("tput rc && tput ed")
+        if utils.is_input_valid(value=value, pattern=ADDING_VALUE_PATTERN):
+            access.add_content(value)
 
 
 def _remove(access: Access) -> None:
@@ -106,8 +102,8 @@ def _remove(access: Access) -> None:
             _log.info(f"{''.join(found_elements)}")
             lines_to_remove = len(found)
             os.system("tput setaf 7")
-            # TODO: use timeout
-            is_accepted = input("Enter 'yes' to remove or any key to cancel: ")
+            text = "Enter 'yes' to remove or any key to cancel: "
+            is_accepted = _get_input_value(text)
 
             if is_accepted == "yes":
                 access.remove_credentials(pattern=pattern)
@@ -117,7 +113,6 @@ def _remove(access: Access) -> None:
     finally:
         if lines_to_remove:
             os.system(f"echo -en '\033[{2 * lines_to_remove + 4}A' && tput ed")
-        access.encrypt_and_export_to_new_file_if_content_updated()
 
 
 def _set_debug_mode() -> None:
@@ -129,7 +124,6 @@ def _set_debug_mode() -> None:
 def main() -> None:
     try:
         input_args = _parse_args()
-
         if input_args.debug:
             _set_debug_mode()
 
@@ -149,13 +143,17 @@ def main() -> None:
                 _log.warning("No encrypted archive found to search in")
             else:
                 _search(access)
-    except Exception:
-        _log.exception("Program failed:")
-    except KeyboardInterrupt:
-        sys.exit(0)
+
+    except GetInputTimedOut as e:
+        _log.info(f"Did not get input value: {e}")
+    except Exception as e:
+        _log.error(f"Program failed: {e}")
     finally:
+        if "access" in locals():
+            access.encrypt_and_export_to_new_file_if_content_updated()
         os.system("tput setaf 7")
         _log.info("Application closed")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

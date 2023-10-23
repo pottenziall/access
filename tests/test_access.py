@@ -51,7 +51,7 @@ class TestCredentials:
         ],
     )
     def test_should_raise_exception_on_wrong_input_values(self, wrong_credentials: Tuple[List[str]]) -> None:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             params = wrong_credentials[0]
             Credentials(*params)
 
@@ -76,7 +76,7 @@ class TestInputPath:
 
     @pytest.mark.parametrize("path", ["/wrong/dir/path", "/wrong/file/path.txt"])
     def test_should_raise_assertion_error_on_wrong_path(self, path: str) -> None:
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             Access(Path(path))
 
 
