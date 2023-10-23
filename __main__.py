@@ -52,12 +52,10 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _get_input_value(timeout: int = 30) -> str:
-    while True:
-        # TODO: improve the method
-        inp, o, e = select.select([sys.stdin], [], [], timeout)
-        if not inp:
-            break
+def _get_input_value(text: str, timeout: int = 30) -> str:
+    _log.info(text)
+    input_value, _, _ = select.select([sys.stdin], [], [], timeout)
+    if input_value:
         return sys.stdin.readline().strip().lower()
     _log.info("Timeout reached, closing the application...")
     raise KeyboardInterrupt
@@ -65,8 +63,8 @@ def _get_input_value(timeout: int = 30) -> str:
 
 def _search(access: Access) -> None:
     while True:
-        _log.info("Type a phrase to search (min 3 ch):")
-        value = _get_input_value()
+        input_message = "Type a phrase to search (min 3 ch):"
+        value = _get_input_value(input_message)
         if utils.is_input_valid(value=value, pattern=SEARCH_VALUE_PATTERN):
             found = access.search_in_content(value)
             if found:
@@ -78,9 +76,9 @@ def _add(access: Access) -> None:
     _log.info(f"Please, enter credentials, like 'gmail.com mylogin 12345678 authentication'. The last is default")
     try:
         while True:
-            _log.info(f"New credentials:")
             os.system("tput sc")
-            value = _get_input_value(timeout=60)
+            input_message = "New credentials:"
+            value = _get_input_value(input_message, timeout=60)
             os.system("tput rc && tput ed")
             if utils.is_input_valid(value=value, pattern=ADDING_VALUE_PATTERN):
                 access.add_content(value)
@@ -95,8 +93,8 @@ def _remove(access: Access) -> None:
     lines_to_remove = 0
     try:
         while True:
-            _log.info(f"Please input credentials pattern to remove")
-            pattern = _get_input_value(timeout=60)
+            input_message = "Please input credentials pattern to remove:"
+            pattern = _get_input_value(input_message, timeout=60)
             if not pattern:
                 continue
             found = access.search_in_content(pattern=pattern)
