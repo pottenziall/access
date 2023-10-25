@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.2'
+#  version ='1.0.3'
 #  -------------------------------------------------------------------------
 
 import io
@@ -170,8 +170,7 @@ class Access:
             _log.error("No content to search in")
             return set()
         found = {credentials for credentials in self.__credentials if re.search(pattern, str(credentials))}
-        if not found:
-            _log.info(f'No credential found for the pattern "{pattern}"')
+        _log.info(f"Found {len(found)} credentials for the pattern '{pattern}'")
         return found
 
     def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:

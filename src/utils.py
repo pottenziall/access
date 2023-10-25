@@ -1,19 +1,26 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.2'
+#  version ='1.0.3'
 #  -------------------------------------------------------------------------
 
 import json
 import logging
 import os
 import re
+from enum import IntEnum
 from pathlib import Path
 from typing import Dict, List, Union
 
 _log = logging.getLogger(__name__)
 
 JsonContent = Dict[str, Union[str, int]]
+
+
+class Color(IntEnum):
+    DEFAULT = 7
+    RED = 1
+    GREEN = 2
 
 
 def is_input_valid(value: str, pattern: str) -> bool:
@@ -23,11 +30,17 @@ def is_input_valid(value: str, pattern: str) -> bool:
     return False
 
 
-def short_show(data: List[str], timeout: int = 5) -> None:
-    os.system("tput setaf 2")
-    lines = "\n".join(data)
+def short_show(data: List[str], color: Color = Color.DEFAULT, timeout: int = 5) -> None:
+    os.system("tput smcup")
+    os.system(f"tput setaf {color.value}")
+    lines = "\n\n".join(data)
     os.system(f"echo $'{lines}' | timeout --foreground {timeout} less -e")
-    os.system("tput setaf 7")
+    restore_screen()
+
+
+def restore_screen() -> None:
+    os.system(f"tput setaf {Color.DEFAULT.value}")
+    os.system("tput rmcup")
 
 
 def read_config(path: Path) -> JsonContent:
