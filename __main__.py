@@ -3,7 +3,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.3'
+#  version ='1.0.4'
 #  -------------------------------------------------------------------------
 
 import argparse
@@ -19,11 +19,24 @@ from src.access_manager import Access
 
 APP_DIR = Path(__file__).parent
 CONFIG_FILE_PATH = APP_DIR / "config.conf"
+LOG_FILE_PATH = APP_DIR / "access.log"
 SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9.]{3,}$"
 ADD_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,} \S{0,}$"
 
 _log = logging.getLogger("main")
-logging.basicConfig(format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
+
+root = logging.getLogger()
+root.setLevel(logging.NOTSET)
+stdout_formatter = logging.Formatter("%(message)s")
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(stdout_formatter)
+console_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter("%(asctime)s_%(levelname)s:%(name)s:%(lineno)d:%(message)s")
+file_handler = logging.FileHandler(LOG_FILE_PATH, "a", encoding="utf-8")
+file_handler.setFormatter(file_formatter)
+file_handler.setLevel(logging.DEBUG)
+root.addHandler(file_handler)
+root.addHandler(console_handler)
 
 
 class GetInputTimedOut(Exception):
@@ -80,27 +93,26 @@ def _search(access: Access) -> None:
     if input_value and utils.is_input_valid(value=input_value, pattern=SEARCH_VALUE_PATTERN):
         found = access.search_in_content(input_value)
         if found:
-            # TODO: improve
             utils.short_show([str(item) for item in found], color=utils.Color.GREEN)
 
 
 def _add(access: Access) -> None:
     input_message = "Input new credentials:"
-    value = _get_input_value_safely(input_message, timeout=60)
-    if utils.is_input_valid(value=value, pattern=ADD_VALUE_PATTERN):
-        access.add_content(value)
+    input_value = _get_input_value_safely(input_message, timeout=60)
+    if input_value and utils.is_input_valid(value=input_value, pattern=ADD_VALUE_PATTERN):
+        access.add_content(input_value)
 
 
 def _remove(access: Access) -> None:
     input_message = "Please input credentials pattern to remove:"
-    pattern = _get_input_value_safely(input_message, timeout=60)
-    if pattern:
-        credentials_to_remove = access.search_in_content(pattern=pattern)
+    input_pattern = _get_input_value_safely(input_message, timeout=60)
+    if input_pattern:
+        credentials_to_remove = access.search_in_content(pattern=input_pattern)
         if credentials_to_remove:
             utils.short_show([str(c) for c in credentials_to_remove], utils.Color.RED)
             remove_message = "Enter 'yes' to remove or any key to cancel: "
             if input(remove_message) == "yes":
-                access.remove_credentials(pattern=pattern)
+                access.remove_credentials(pattern=input_pattern)
             else:
                 _log.info("Skip removing")
 
@@ -142,6 +154,7 @@ def main() -> None:
         _log.exception("Program failed:")
     finally:
         _log.info("Close application")
+        _log.debug(f"{150*'='}")
         sys.exit(0)
 
 

@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.3'
+#  version ='1.0.4'
 #  -------------------------------------------------------------------------
 
 import io
@@ -44,7 +44,7 @@ class Credentials:
             try:
                 credentials.add(cls(*line.split()))
             except RuntimeError:
-                _log.error(f"A field contain spaces in line {i + 1}. Skip creating instance for the values")
+                _log.error(f"A field contain spaces in line {i + 1}. Skip creating instance for the line")
         return credentials
 
     @classmethod
@@ -132,7 +132,7 @@ class Access:
         if not sorted_files_paths:
             return None
         latest_file_path = sorted_files_paths[0]
-        _log.info(f"Latest encrypted file: {latest_file_path}")
+        _log.info(f"Latest encrypted archive: {latest_file_path}")
         return latest_file_path
 
     def _get_sorted_files_by_date_desc(self) -> Optional[List[Path]]:
@@ -144,8 +144,9 @@ class Access:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
             return None
         file_paths = sorted(file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True)
-        sorted_several_files = ["\n\t" + str(p) for p in file_paths[:10]]
-        _log.debug(f"First up to 10 files: {''.join(sorted_several_files)}" + "\n\t...")
+        max_show_files = 5
+        sorted_several_files = ["\n\t" + str(p) for p in file_paths[:max_show_files]]
+        _log.debug(f"First up to {max_show_files} files: {''.join(sorted_several_files)}" + "\n\t...")
         return file_paths
 
     def decrypt_file(self, path: Path, passphrase: Optional[str] = None) -> None:
@@ -161,7 +162,7 @@ class Access:
             raise ValueError("Wrong password")
         self.archive_path = path
         self.__credentials = Credentials.from_string(result.data.decode("utf8"))
-        _log.debug(f"Got content of the file: {path}")
+        _log.debug(f"Got credentials of the file: {path}")
         del result
 
     def search_in_content(self, pattern: str) -> Set[Credentials]:
@@ -170,7 +171,7 @@ class Access:
             _log.error("No content to search in")
             return set()
         found = {credentials for credentials in self.__credentials if re.search(pattern, str(credentials))}
-        _log.info(f"Found {len(found)} credentials for the pattern '{pattern}'")
+        _log.info(f"Found {len(found)} credentials")
         return found
 
     def encrypt_and_export_to_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
@@ -204,7 +205,7 @@ class Access:
         v_file.close()
         if not result.ok:
             raise RuntimeError(f"Encryption process failed with status: '{result.status}'")
-        _log.info(f"Encrypted file successfully created: {archive_path}")
+        _log.info(f"Encrypted archive successfully created: {archive_path}")
         return archive_path
 
     def _generate_file_path(self) -> Path:
@@ -224,7 +225,7 @@ class Access:
         """Add credentials to an existing content"""
         self.__credentials.update(Credentials.from_string(new_content))
         self._content_updated = True
-        _log.debug("New content added to list")
+        _log.debug("New credentials added to the existing base")
 
     def remove_credentials(self, pattern: str) -> None:
         if not pattern:
@@ -233,4 +234,4 @@ class Access:
         found = self.search_in_content(pattern)
         self.__credentials = self.__credentials - found
         self._content_updated = True
-        _log.info(f"{len(found)} items removed successfully")
+        _log.info(f"{len(found)} credentials removed successfully")
