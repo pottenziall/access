@@ -1,3 +1,5 @@
 .idea/
 *.gpg
 *.conf
+*.log
+!encrypted_archive_example.gpg

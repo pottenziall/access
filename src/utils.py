@@ -40,7 +40,7 @@ def short_show(data: List[str], color: Color = Color.DEFAULT, timeout: int = 5) 
 
 def restore_screen() -> None:
     os.system(f"tput setaf {Color.DEFAULT.value}")
-    os.system("tput rmcup")
+   # os.system("tput rmcup")
 
 
 def read_config(path: Path) -> JsonContent:
@@ -48,9 +48,12 @@ def read_config(path: Path) -> JsonContent:
         _log.warning(f"Config path does not exist or is not a file: {path}")
         return {}
     with open(path, encoding="utf8") as f:
-        content = json.loads(f.read())
-        assert isinstance(content, dict)
-        return content
+        content = f.read()
+        if not content:
+            return {}
+        config_dict = json.loads(content)
+        assert isinstance(config_dict, dict)
+        return config_dict
 
 
 def add_to_config(path: Path, data: Dict[str, str]) -> None:
