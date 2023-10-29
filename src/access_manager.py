@@ -81,7 +81,7 @@ class Access:
         self._ext: str = extension
         self.__credentials: Set[Credentials] = set()
         self._content_updated: bool = False
-        self._gpg = gnupg.GPG()  # verbose=True)
+        self._gpg = gnupg.GPG()
         self._recognize_and_work_with_path(path=path, passphrase=passphrase)
 
     def __enter__(self) -> "Access":

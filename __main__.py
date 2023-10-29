@@ -131,7 +131,7 @@ def main() -> None:
 
         if input_args.work_path is not None:
             assert Path(input_args.work_path).exists(), f"Path does not exist: {input_args.work_path}"
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_path": input_args.work_path}, assert_ok=True)
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_path": input_args.work_path})
 
         config = utils.read_config(path=CONFIG_FILE_PATH)
         assert config.get("work_path", False), "Provide '--work_path'. It will be stored in a config file"

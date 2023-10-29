@@ -53,11 +53,9 @@ def read_config(path: Path) -> JsonContent:
         return content
 
 
-def add_to_config(path: Path, data: Dict[str, str], assert_ok: bool = False) -> None:
+def add_to_config(path: Path, data: Dict[str, str]) -> None:
+    content = read_config(path)
     with open(path, "w+", encoding="utf-8") as f:
-        content = json.load(f) if f.read() else {}
-        if assert_ok:
-            data = {k: v for k, v in data.items() if content.get(k, None) != v}
         content.update(data)
         json.dump(content, f)
     _log.debug(f"Added data to the config file: {data}")
