@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.4'
+#  version ='1.0.5'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -14,12 +14,13 @@ import pytest
 
 from src.access_manager import Access, Credentials
 
-PRIVACY_ARCHIVE_EXAMPLE_PATH = Path("encrypted_archive_example.gpg")
-TEXT_FILE_EXAMPLE_PATH = Path("text_file_example.txt")
-CREDENTIALS_1 = "resource_1 login_1 password_1"
-CREDENTIALS_2 = "resource_2 login_2 password_2"
+DIR = Path(__file__).parent
+PRIVACY_ARCHIVE_EXAMPLE_PATH = DIR / "encrypted_archive_example.gpg"
+TEXT_FILE_EXAMPLE_PATH = DIR / "text_file_example.txt"
+CREDENTIALS_1 = "resource_1 login_1 password_1 authentication"
+CREDENTIALS_2 = "resource_2 login_2 password_2 authentication"
 CONTENT = f"{CREDENTIALS_1}\n{CREDENTIALS_2}"
-UPDATE_CONTENT = "resource_3 login_3 password_3"
+UPDATE_CONTENT = "resource_3 login_3 password_3 authentication"
 PASSPHRASE = "12345678"
 
 _log = logging.getLogger(__name__)
@@ -101,10 +102,10 @@ class TestAccess:
         ],
     )
     def test_should_find_proper_result_for_keyword(self, keyword: str, result: str) -> None:
-        resource, login, password = result.split()
+        resource, login, password, kind = result.split()
         with Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE) as access:
             found = access.search_in_content(keyword)
-            assert found == {Credentials(resource, login, password)}
+            assert found == {Credentials(resource, login, password, kind)}
 
     def test_pack_updated_content_of_existing_archive_to_new_archive(self) -> None:
         access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH, passphrase=PASSPHRASE)
@@ -112,7 +113,7 @@ class TestAccess:
         access.encrypt_and_export_to_new_file_if_content_updated(passphrase=PASSPHRASE)
 
         new_access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH.parent, passphrase=PASSPHRASE)
-        resource, login, password = UPDATE_CONTENT.split()
+        resource, login, password, kind = UPDATE_CONTENT.split()
         found = new_access.search_in_content(pattern=resource)
         assert found == {Credentials(resource, login, password)}
         assert new_access.archive_path is not None
@@ -125,9 +126,9 @@ class TestAccess:
 
         new_access = Access(PRIVACY_ARCHIVE_EXAMPLE_PATH.parent, passphrase=PASSPHRASE)
         for line in CONTENT.splitlines() + [UPDATE_CONTENT]:
-            resource, login, password = line.split()
+            resource, login, password, kind = line.split()
             found = new_access.search_in_content(pattern=resource)
-            assert found == {Credentials(resource, login, password)}
+            assert found == {Credentials(resource, login, password, kind)}
 
         assert new_access.archive_path is not None
         os.remove(new_access.archive_path)

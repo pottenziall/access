@@ -44,9 +44,6 @@ def short_show(data: List[str], color: Color = Color.DEFAULT, timeout: int = 5) 
 
 
 def read_config(path: Path) -> JsonContent:
-    if not path.is_file():
-        _log.warning(f"Config path does not exist or is not a file: {path}")
-        return {}
     with open(path, encoding="utf8") as f:
         content = f.read()
         if not content:
@@ -61,4 +58,4 @@ def add_to_config(path: Path, data: Dict[str, str]) -> None:
     with open(path, "w+", encoding="utf-8") as f:
         content.update(data)
         json.dump(content, f)
-    _log.debug(f"Added data to the config file: {data}")
+    _log.debug(f"Data has been added to the config file: {data}")

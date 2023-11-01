@@ -65,9 +65,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-w",
         "--work_path",
-        help="Path to either a directory or an encrypted archive to work with. "
-        "The path will be stored in config.conf file.",
-        default=None,
+        help="Path to either a directory or an encrypted archive or a text file with prepared credentials. "
+             "The dir path (or the file's parent dir if work_path is a file path) will be stored in config.conf file. "
+             "Default value is __file__ parent dir",
+        default=Path(),
     )
     parser.add_argument("-d", "--debug", help="Enable debug mode", action="store_true")
     return parser.parse_args()
@@ -132,13 +133,19 @@ def main() -> None:
         if input_args.debug:
             _set_debug_mode()
 
-        if input_args.work_path is not None:
-            assert Path(input_args.work_path).exists(), f"Path does not exist: {input_args.work_path}"
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_path": input_args.work_path})
-
-        config = utils.read_config(path=CONFIG_FILE_PATH)
-        assert config.get("work_path", False), "Provide '--work_path'. It will be stored in a config file"
-        access = Access(Path(str(config["work_path"])))
+        work_path = Path(input_args.work_path)
+        if work_path.is_file():
+            _log.info("FILE")
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_path.parent)})
+            access = Access(work_path)
+        elif work_path.is_dir():
+            _log.info("DIR")
+            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_path)})
+            config = utils.read_config(path=CONFIG_FILE_PATH)
+            assert config.get("work_dir", False), "Provide '--work_path'. It will be stored in a config file"
+            access = Access(Path(str(config["work_dir"])))
+        else:
+            raise RuntimeError("Unhandled exception")
 
         if input_args.add:
             _cycle_with_saving_results(_add, access)
@@ -147,8 +154,7 @@ def main() -> None:
         else:
             if access.archive_path is None:
                 _log.warning("No encrypted archive found to search in")
-            else:
-                _cycle_with_saving_results(_search, access)
+            _cycle_with_saving_results(_search, access)
 
     except GetInputTimedOut as e:
         _log.info(f"Did not get input value: {e}")

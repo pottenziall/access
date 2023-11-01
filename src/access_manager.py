@@ -71,10 +71,10 @@ class Access:
     """
 
     def __init__(
-        self,
-        path: Path,
-        passphrase: Optional[str] = None,
-        extension: str = PRIVACY_ARCHIVE_EXTENSION,
+            self,
+            path: Path,
+            passphrase: Optional[str] = None,
+            extension: str = PRIVACY_ARCHIVE_EXTENSION,
     ) -> None:
         self.dir: Optional[Path] = None
         self.archive_path: Optional[Path] = None
@@ -88,10 +88,10 @@ class Access:
         return self
 
     def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+            self,
+            exc_type: Optional[Type[BaseException]],
+            exc_val: Optional[BaseException],
+            exc_tb: Optional[TracebackType],
     ) -> None:
         self.encrypt_and_export_to_new_file_if_content_updated()
 
@@ -115,7 +115,7 @@ class Access:
             raise ValueError(f"Wrong path passed: {path}")
 
     def _read_file(self, path: Path) -> None:
-        self.__credentials = Credentials.from_file(path)
+        self._update_credentials(Credentials.from_file(path))
         _log.debug(f"Got content of the file: {path}")
 
     def _find_and_decrypt_file(self, passphrase: Optional[str] = None) -> None:
@@ -170,7 +170,7 @@ class Access:
         if not self.__credentials:
             _log.error("No content to search in")
             return set()
-        found = {credentials for credentials in self.__credentials if re.search(pattern, str(credentials))}
+        found = {c for c in self.__credentials if re.search(pattern, str(c))}
         _log.info(f"Found {len(found)} credentials")
         return found
 
@@ -222,10 +222,13 @@ class Access:
         raise RuntimeError("All possible file names already exist. Remove at least one old file")
 
     def add_content(self, new_content: str) -> None:
-        """Add credentials to an existing content"""
-        self.__credentials.update(Credentials.from_string(new_content))
+        """Add credentials to the existing base in memory"""
+        self._update_credentials(Credentials.from_string(new_content))
+
+    def _update_credentials(self, credentials_sets: Set[Credentials]) -> None:
+        self.__credentials.update(credentials_sets)
         self._content_updated = True
-        _log.debug("New credentials added to the existing base")
+        _log.debug(f"{len(credentials_sets)} new credentials sets has been added to the existing base in memory")
 
     def remove_credentials(self, pattern: str) -> None:
         if not pattern:
