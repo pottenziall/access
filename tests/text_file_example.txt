@@ -1,2 +1,0 @@
-resource_1 login_1 password_1 authentication
-resource_2 login_2 password_2 authentication
