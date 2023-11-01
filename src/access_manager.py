@@ -1,20 +1,20 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.4'
+#  version ='1.0.5'
 #  -------------------------------------------------------------------------
 
 import io
 import logging
 import os
 import re
+from dataclasses import dataclass, fields
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import List, Optional, Set, Type
 
 import gnupg  # type: ignore
-from dataclasses import dataclass, fields
 
 _log = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ class Credentials:
     @classmethod
     def from_string(cls, string_value: str) -> Set["Credentials"]:
         credentials = set()
-        for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR)):
-            if len(line.split()) > len(fields(cls)):
-                _log.error(f"Invalid line {i + 1}. Skip parsing the line")
+        for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR), start=1):
+            if len(line.split()) != len(fields(cls)):
+                _log.error(f"Invalid line {i}. Skip parsing the line")
                 continue
             try:
                 credentials.add(cls(*line.split()))
@@ -62,8 +62,8 @@ class Credentials:
 class Access:
     """
     Wrapper class for 'gnupg' encrypter.
-    Save info sets (e.g. "gmail.com login password") separated by 'separator' into an encrypted file.
-    Use context manager for automatic encrypting some changed content on exiting.
+    Save credentials (e.g. "gmail.com login password authentication") into an encrypted file.
+    Automatic changed content encryption on exiting.
 
     :param path: either path to an encrypted file or a directory that will be used as working directory
     :param passphrase: if provided, a modal window for input a passphrase won't appear (useful for testing)
@@ -143,7 +143,7 @@ class Access:
         if not file_paths:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
             return None
-        file_paths = sorted(file_paths, key=lambda x: os.path.getctime(str(x)), reverse=True)
+        file_paths = sorted(file_paths, key=lambda x: os.path.getmtime(str(x)), reverse=True)
         max_show_files = 5
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:max_show_files]]
         _log.debug(f"First up to {max_show_files} files: {''.join(sorted_several_files)}" + "\n\t...")

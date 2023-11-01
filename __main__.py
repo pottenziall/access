@@ -3,7 +3,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.4'
+#  version ='1.0.5'
 #  -------------------------------------------------------------------------
 
 import argparse
@@ -20,8 +20,8 @@ from src.access_manager import Access
 APP_DIR = Path(__file__).parent
 CONFIG_FILE_PATH = APP_DIR / "config.conf"
 LOG_FILE_PATH = APP_DIR / "access.log"
-SEARCH_VALUE_PATTERN = r"^[A-Za-z0-9.]{3,}$"
-ADD_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,} \S{0,}$"
+SEARCH_VALUE_PATTERN = r".{3,}"
+ADD_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}( \S{3,40})?$"
 
 _log = logging.getLogger("main")
 
@@ -37,6 +37,9 @@ file_handler.setFormatter(file_formatter)
 file_handler.setLevel(logging.DEBUG)
 root.addHandler(file_handler)
 root.addHandler(console_handler)
+
+gpg_logger = logging.getLogger("gnupg")
+gpg_logger.setLevel(logging.ERROR)
 
 
 class GetInputTimedOut(Exception):
@@ -150,7 +153,6 @@ def main() -> None:
     except GetInputTimedOut as e:
         _log.info(f"Did not get input value: {e}")
     except Exception:
-        utils.restore_screen()
         _log.exception("Program failed:")
     finally:
         _log.info("Close application")

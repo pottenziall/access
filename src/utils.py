@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.4'
+#  version ='1.0.5'
 #  -------------------------------------------------------------------------
 
 import json
@@ -31,16 +31,16 @@ def is_input_valid(value: str, pattern: str) -> bool:
 
 
 def short_show(data: List[str], color: Color = Color.DEFAULT, timeout: int = 5) -> None:
-    os.system("tput smcup")
-    os.system(f"tput setaf {color.value}")
-    lines = "\n\n".join(data)
-    os.system(f"echo $'{lines}' | timeout --foreground {timeout} less -e")
-    restore_screen()
-
-
-def restore_screen() -> None:
-    os.system(f"tput setaf {Color.DEFAULT.value}")
-   # os.system("tput rmcup")
+    try:
+        os.system("tput smcup")
+        os.system(f"tput setaf {color.value}")
+        lines = "\n\n".join(data)
+        os.system(f"echo $'{lines}' && sleep {timeout}")
+    except Exception as e:
+        _log.error(f"Error when show messages: {e}")
+    finally:
+        os.system(f"tput setaf {Color.DEFAULT.value}")
+        os.system("tput rmcup")
 
 
 def read_config(path: Path) -> JsonContent:
