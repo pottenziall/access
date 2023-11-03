@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.4'
+#  version ='1.1.0'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -41,7 +41,7 @@ def test_should_check_if_input_value_is_valid(word: str, pattern: str, result: b
     indirect=["tmp_file"],
 )
 def test_should_add_content_to_config_file(tmp_file: Path, data: Dict[str, str], result: utils.JsonContent) -> None:
-    utils.add_to_config(tmp_file, data)
+    utils.update_config(tmp_file, data)
     with open(tmp_file, "r", encoding="utf8") as f:
         assert f.read() == result
 

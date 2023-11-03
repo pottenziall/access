@@ -3,7 +3,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.5'
+#  version ='1.1.0'
 #  -------------------------------------------------------------------------
 
 import argparse
@@ -11,11 +11,13 @@ import logging
 import os
 import select
 import sys
+from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import Optional
 
 from src import utils
 from src.access_manager import Access
+from src.logging_utils import setup_logging
 
 APP_DIR = Path(__file__).parent
 CONFIG_FILE_PATH = APP_DIR / "config.conf"
@@ -25,21 +27,7 @@ ADD_VALUE_PATTERN = r"^\S{3,} \S{3,} \S{3,}( \S{3,40})?$"
 
 _log = logging.getLogger("main")
 
-root = logging.getLogger()
-root.setLevel(logging.NOTSET)
-stdout_formatter = logging.Formatter("%(message)s")
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(stdout_formatter)
-console_handler.setLevel(logging.INFO)
-file_formatter = logging.Formatter("%(asctime)s_%(levelname)s:%(name)s:%(lineno)d:%(message)s")
-file_handler = logging.FileHandler(LOG_FILE_PATH, "a", encoding="utf-8")
-file_handler.setFormatter(file_formatter)
-file_handler.setLevel(logging.DEBUG)
-root.addHandler(file_handler)
-root.addHandler(console_handler)
-
-gpg_logger = logging.getLogger("gnupg")
-gpg_logger.setLevel(logging.ERROR)
+setup_logging(LOG_FILE_PATH)
 
 
 class GetInputTimedOut(Exception):
@@ -47,8 +35,14 @@ class GetInputTimedOut(Exception):
         super().__init__(f"Timeout {timeout}s reached when waiting for input value")
 
 
-def _parse_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Search for credentials in an encrypted archive.")
+    parser.add_argument(
+        "-s",
+        "--search",
+        help="Search credentials for a pattern",
+        action="store_true",
+    )
     parser.add_argument(
         "-a",
         "--add",
@@ -74,15 +68,20 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _cycle_with_saving_results(func: Callable[[Access], None], access: Access) -> None:
-    try:
-        while True:
-            func(access)
-    finally:
-        access.encrypt_and_export_to_new_file_if_content_updated()
+class Function(Enum):
+    SEARCH = "search"
+    ADD = "add"
+    REMOVE = "remove"
+    UNDEFINED = "undefined"
 
 
-def _get_input_value_safely(text: str, timeout: int = 30) -> str:
+def create_config_if_not_exist() -> None:
+    if not CONFIG_FILE_PATH.exists():
+        with open(CONFIG_FILE_PATH, "w+", encoding="utf8") as f:
+            pass
+
+
+def get_input_value_safely(text: str, timeout: int = 30) -> str:
     _log.info(text)
     input_value, _, _ = select.select([sys.stdin], [], [], timeout)
     os.system("tput cuu 1 && tput ed")
@@ -91,25 +90,61 @@ def _get_input_value_safely(text: str, timeout: int = 30) -> str:
     raise GetInputTimedOut(timeout)
 
 
-def _search(access: Access) -> None:
+def run_function_with_result_save(access: Access, selected_function: Optional[Function] = None) -> None:
+    # TODO: change prompt
+    try:
+        while True:
+            if selected_function is None:
+                input_value = input("Please enter 'search', 'add' or 'remove' to continue: ")
+                if input_value not in [v.value for v in Function]:
+                    selected_function = Function.UNDEFINED
+                else:
+                    selected_function = Function(input_value)
+            if selected_function == Function.SEARCH:
+                repeat_call = search(access)
+            elif selected_function == Function.ADD:
+                repeat_call = add(access)
+            elif selected_function == Function.REMOVE:
+                repeat_call = remove(access)
+            else:
+                _log.info("Wrong input value")
+                repeat_call = False
+            if not repeat_call:
+                selected_function = None
+    finally:
+        access.encrypt_and_export_to_new_file_if_content_updated()
+
+
+def search(access: Access) -> bool:
     input_message = "Type a phrase to search (min 3 ch):"
-    input_value = _get_input_value_safely(input_message)
+    input_value = get_input_value_safely(input_message)
+    if input_value == "exit":
+        _log.info("Exit searching mode")
+        return False
     if input_value and utils.is_input_valid(value=input_value, pattern=SEARCH_VALUE_PATTERN):
         found = access.search_in_content(input_value)
         if found:
             utils.short_show([str(item) for item in found], color=utils.Color.GREEN)
+    return True
 
 
-def _add(access: Access) -> None:
+def add(access: Access) -> bool:
     input_message = "Input new credentials:"
-    input_value = _get_input_value_safely(input_message, timeout=60)
+    input_value = get_input_value_safely(input_message, timeout=60)
+    if input_value == "exit":
+        _log.info("Exit adding mode")
+        return False
     if input_value and utils.is_input_valid(value=input_value, pattern=ADD_VALUE_PATTERN):
         access.add_content(input_value)
+    return True
 
 
-def _remove(access: Access) -> None:
+def remove(access: Access) -> bool:
     input_message = "Please input credentials pattern to remove:"
-    input_pattern = _get_input_value_safely(input_message, timeout=60)
+    input_pattern = get_input_value_safely(input_message, timeout=60)
+    if input_pattern == "exit":
+        _log.info("Exit removing mode")
+        return False
     if input_pattern:
         credentials_to_remove = access.search_in_content(pattern=input_pattern)
         if credentials_to_remove:
@@ -119,42 +154,51 @@ def _remove(access: Access) -> None:
                 access.remove_credentials(pattern=input_pattern)
             else:
                 _log.info("Skip removing")
+    return True
 
 
-def _set_debug_mode() -> None:
+def set_debug_mode() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
     _log.info("Debug mode enabled")
 
 
+def get_work_path(path: Path) -> Path:
+    if path.is_file():
+        utils.update_config(path=CONFIG_FILE_PATH, data={"work_dir": str(path.parent)})
+    elif path.is_dir():
+        if path != Path():
+            utils.update_config(path=CONFIG_FILE_PATH, data={"work_dir": str(path)})
+    else:
+        _log.error(f"Wrong path passed: {path}")
+        sys.exit(1)
+    config = utils.read_config(path=CONFIG_FILE_PATH)
+    if not config.get("work_dir", False):
+        _log.warning(f"Please provide '--work_path'. It will be stored in: {CONFIG_FILE_PATH}")
+        sys.exit(0)
+    path = Path(str(config["work_dir"]))
+    return path
+
+
 def main() -> None:
     try:
-        input_args = _parse_args()
+        input_args = parse_args()
         if input_args.debug:
-            _set_debug_mode()
-
-        work_path = Path(input_args.work_path)
-        if work_path.is_file():
-            _log.info("FILE")
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_path.parent)})
-            access = Access(work_path)
-        elif work_path.is_dir():
-            _log.info("DIR")
-            utils.add_to_config(path=CONFIG_FILE_PATH, data={"work_dir": str(work_path)})
-            config = utils.read_config(path=CONFIG_FILE_PATH)
-            assert config.get("work_dir", False), "Provide '--work_path'. It will be stored in a config file"
-            access = Access(Path(str(config["work_dir"])))
-        else:
-            raise RuntimeError("Unhandled exception")
+            set_debug_mode()
+        create_config_if_not_exist()
+        work_path = get_work_path(Path(input_args.work_path))
+        access = Access(work_path)
 
         if input_args.add:
-            _cycle_with_saving_results(_add, access)
+            run_function_with_result_save(access, Function.ADD)
         elif input_args.remove:
-            _cycle_with_saving_results(_remove, access)
+            run_function_with_result_save(access, Function.REMOVE)
+        elif input_args.search:
+            run_function_with_result_save(access, Function.SEARCH)
         else:
-            if access.archive_path is None:
-                _log.warning("No encrypted archive found to search in")
-            _cycle_with_saving_results(_search, access)
+            #            if access.archive_path is None:
+            #                _log.warning("No encrypted archive found to search in")
+            run_function_with_result_save(access)
 
     except GetInputTimedOut as e:
         _log.info(f"Did not get input value: {e}")

@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.5'
+#  version ='1.1.0'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -119,10 +119,10 @@ class TestAccessInputPath:
         assert access.dir == gpg_file.parent
         assert access.archive_path == gpg_file
 
-    def test_should_recognize_input_text_file(self, txt_file: Path) -> None:
+    def test_should_recognize_both_text_file_and_encrypted_file_in_same_folder(self, txt_file: Path) -> None:
         access = Access(txt_file)
         assert access.dir == txt_file.parent
-        assert access.archive_path is None
+        assert access.archive_path is not None
 
     @pytest.mark.parametrize("wrong_path", ["/wrong/dir/path", "/wrong/file/path.txt"])
     def test_should_raise_assertion_error_on_wrong_path(self, wrong_path: str) -> None:

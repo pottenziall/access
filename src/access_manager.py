@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.5'
+#  version ='1.1.0'
 #  -------------------------------------------------------------------------
 
 import io
@@ -98,9 +98,9 @@ class Access:
     def _recognize_and_work_with_path(self, path: Path, passphrase: Optional[str] = None) -> None:
         """
         Recognize path:
-            - search for encrypt files if is a dir
-            - decrypt if an encrypted file
-            - import content into a memory if a text file
+            - a dir: search for latest encrypted file
+            - an encrypted file: decrypt and load its content
+            - a text file: load its content and concatenate with an encrypted file if found in the folder
         """
         if path.is_file():
             self.dir = path.parent
@@ -108,6 +108,7 @@ class Access:
                 self.decrypt_file(path=path, passphrase=passphrase)
                 return
             self._read_file(path)
+            self._find_and_decrypt_file(passphrase=passphrase)
         elif path.is_dir():
             self.dir = path
             self._find_and_decrypt_file(passphrase=passphrase)
@@ -121,7 +122,7 @@ class Access:
     def _find_and_decrypt_file(self, passphrase: Optional[str] = None) -> None:
         archive_path = self.find_latest_file()
         if archive_path is None:
-            _log.warning(f"{self.dir} does not contain any files to decrypt")
+            _log.warning(f"Directory {self.dir} does not contain any files to decrypt")
             return
         self.decrypt_file(path=archive_path, passphrase=passphrase)
 
@@ -138,7 +139,7 @@ class Access:
     def _get_sorted_files_by_date_desc(self) -> Optional[List[Path]]:
         """Search in a directory for files with "self._ext" extension"""
         assert self.dir, "Dir path is not set"
-        _log.debug(f'Search for "{self._ext}" files in {self.dir}...')
+        _log.debug(f'Searching for "{self._ext}" files in {self.dir}...')
         file_paths = [p for p in self.dir.iterdir() if p.name.endswith(self._ext)]
         if not file_paths:
             _log.warning(f"No '{self._ext}' files found in {self.dir}")
@@ -146,7 +147,7 @@ class Access:
         file_paths = sorted(file_paths, key=lambda x: os.path.getmtime(str(x)), reverse=True)
         max_show_files = 5
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:max_show_files]]
-        _log.debug(f"First up to {max_show_files} files: {''.join(sorted_several_files)}" + "\n\t...")
+        _log.debug(f'First up to {max_show_files} "{self._ext}" files: {"".join(sorted_several_files)}" + "\n\t...')
         return file_paths
 
     def decrypt_file(self, path: Path, passphrase: Optional[str] = None) -> None:
@@ -161,14 +162,14 @@ class Access:
             _log.error("Wrong password")
             raise ValueError("Wrong password")
         self.archive_path = path
-        self.__credentials = Credentials.from_string(result.data.decode("utf8"))
+        self.__credentials.update(Credentials.from_string(result.data.decode("utf8")))
         _log.debug(f"Got credentials of the file: {path}")
         del result
 
     def search_in_content(self, pattern: str) -> Set[Credentials]:
         """Search for 'keyword' within decrypted file content"""
         if not self.__credentials:
-            _log.error("No content to search in")
+            _log.warning("No content to search in")
             return set()
         found = {c for c in self.__credentials if re.search(pattern, str(c))}
         _log.info(f"Found {len(found)} credentials")

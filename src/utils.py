@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.0.5'
+#  version ='1.1.0'
 #  -------------------------------------------------------------------------
 
 import json
@@ -44,6 +44,9 @@ def short_show(data: List[str], color: Color = Color.DEFAULT, timeout: int = 5) 
 
 
 def read_config(path: Path) -> JsonContent:
+    if not path.exists():
+        _log.warning(f"Config file path does not exist: {path}")
+        return {}
     with open(path, encoding="utf8") as f:
         content = f.read()
         if not content:
@@ -53,9 +56,9 @@ def read_config(path: Path) -> JsonContent:
         return config_dict
 
 
-def add_to_config(path: Path, data: Dict[str, str]) -> None:
+def update_config(path: Path, data: Dict[str, str]) -> None:
     content = read_config(path)
     with open(path, "w+", encoding="utf-8") as f:
         content.update(data)
         json.dump(content, f)
-    _log.debug(f"Data has been added to the config file: {data}")
+    _log.debug(f"Config file updated with: {data}")
