@@ -86,7 +86,7 @@ def get_input_value_safely(text: str, timeout: int = 30) -> str:
     input_value, _, _ = select.select([sys.stdin], [], [], timeout)
     os.system("tput cuu 1 && tput ed")
     if input_value:
-        return sys.stdin.readline().strip().lower()
+        return sys.stdin.readline().strip()
     raise GetInputTimedOut(timeout)
 
 
@@ -117,7 +117,7 @@ def run_function_with_result_save(access: Access, selected_function: Optional[Fu
 
 def search(access: Access) -> bool:
     input_message = "Type a phrase to search (min 3 ch):"
-    input_value = get_input_value_safely(input_message)
+    input_value = get_input_value_safely(input_message).lower()
     if input_value == "exit":
         _log.info("Exit searching mode")
         return False
@@ -166,6 +166,7 @@ def set_debug_mode() -> None:
 def get_work_path(path: Path) -> Path:
     if path.is_file():
         utils.update_config(path=CONFIG_FILE_PATH, data={"work_dir": str(path.parent)})
+        return path
     elif path.is_dir():
         if path != Path():
             utils.update_config(path=CONFIG_FILE_PATH, data={"work_dir": str(path)})
@@ -176,8 +177,7 @@ def get_work_path(path: Path) -> Path:
     if not config.get("work_dir", False):
         _log.warning(f"Please provide '--work_path'. It will be stored in: {CONFIG_FILE_PATH}")
         sys.exit(0)
-    path = Path(str(config["work_dir"]))
-    return path
+    return Path(str(config["work_dir"]))
 
 
 def main() -> None:

@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.1.0'
+#  version ='1.2.0'
 #  -------------------------------------------------------------------------
 
 import io
@@ -28,23 +28,24 @@ class Credentials:
     login: str
     password: str
     kind: str = "authentication"
+    updated_on: str = datetime.today().strftime("%d.%m.%Y")
 
     def __post_init__(self) -> None:
         for field in fields(self):
-            if getattr(self, field.name).count(" "):
+            field_value = getattr(self, field.name)
+            if field_value.count(" "):
                 raise ValueError(f"Field '{field.name}' shouldn't contain spaces")
+        if not re.match(r"\d\d.\d\d.\d\d\d\d", self.updated_on):
+            raise ValueError(f"Wrong date string: {self.updated_on}")
 
     @classmethod
     def from_string(cls, string_value: str) -> Set["Credentials"]:
         credentials = set()
-        for i, line in enumerate(string_value.split(FILE_ITEMS_SEPARATOR), start=1):
-            if len(line.split()) != len(fields(cls)):
-                _log.error(f"Invalid line {i}. Skip parsing the line")
-                continue
+        for i, line in enumerate(string_value.strip().split(FILE_ITEMS_SEPARATOR), start=1):
             try:
                 credentials.add(cls(*line.split()))
-            except RuntimeError:
-                _log.error(f"A field contain spaces in line {i + 1}. Skip creating instance for the line")
+            except Exception:
+                _log.error(f"Invalid line {i}. Skip parsing the line")
         return credentials
 
     @classmethod
@@ -53,10 +54,12 @@ class Credentials:
             return cls.from_string(f.read())
 
     def as_line(self) -> str:
-        return f"{self.resource} {self.login} {self.password} {self.kind}"
+        values = [getattr(self, field.name) for field in fields(self)]
+        return " ".join(values)
 
     def __str__(self) -> str:
-        return f"{self.resource}{5 * ' '}{self.kind}{5 * ' '}{self.login}{5 * ' '}{self.password}"
+        values = [getattr(self, field.name) for field in fields(self)]
+        return (5 * " ").join(values)
 
 
 class Access:
@@ -147,7 +150,7 @@ class Access:
         file_paths = sorted(file_paths, key=lambda x: os.path.getmtime(str(x)), reverse=True)
         max_show_files = 5
         sorted_several_files = ["\n\t" + str(p) for p in file_paths[:max_show_files]]
-        _log.debug(f'First up to {max_show_files} "{self._ext}" files: {"".join(sorted_several_files)}" + "\n\t...')
+        _log.debug(f'First up to {max_show_files} "{self._ext}" files: {"".join(sorted_several_files)}')
         return file_paths
 
     def decrypt_file(self, path: Path, passphrase: Optional[str] = None) -> None:
