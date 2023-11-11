@@ -14,7 +14,7 @@ from typing import Any, Tuple
 
 import pytest
 
-from src.access_manager import Access, Credentials, FILE_ITEMS_SEPARATOR
+from src.encrypter import Credentials, Encrypter, FILE_ITEMS_SEPARATOR
 
 CREDENTIALS_1 = "resource_1 login_1 password_1 authentication 01.01.2023"
 CREDENTIALS_2 = "resource_2 login_2 password_2 authorization 01.01.2023"
@@ -95,44 +95,44 @@ class TestCredentials:
         assert str(sut) == "resource_1     login_1     password_1     kind_1     01.01.2023"
 
 
-class TestAccessInputPath:
+class TestEncrypterInputPath:
     def test_should_recognize_dir_path(self, tmp_path: Path) -> None:
         empty_dir = tmp_path / "empty_dir"
         empty_dir.mkdir()
-        access = Access(empty_dir)
-        assert access.dir == empty_dir
-        assert access.archive_path is None
+        encrypter = Encrypter(empty_dir)
+        assert encrypter.dir == empty_dir
+        assert encrypter.encrypted_file_path is None
 
     @pytest.mark.parametrize("txt_file", [CONTENT], indirect=["txt_file"])
     def test_should_recognize_encrypted_file_path(self, gpg_file: Path, txt_file: Path) -> None:
-        access = Access(gpg_file, passphrase=PASSPHRASE)
-        assert access.dir == gpg_file.parent
-        assert access.archive_path == gpg_file
+        encrypter = Encrypter(gpg_file, passphrase=PASSPHRASE)
+        assert encrypter.dir == gpg_file.parent
+        assert encrypter.encrypted_file_path == gpg_file
 
     @pytest.mark.parametrize("txt_file", [CONTENT], indirect=["txt_file"])
     def test_should_recognize_both_text_file_and_encrypted_file_in_same_folder(
             self, txt_file: Path, gpg_file: Path
     ) -> None:
-        access = Access(txt_file)
-        assert access.dir == txt_file.parent
-        assert access.archive_path is not None
+        encrypter = Encrypter(txt_file)
+        assert encrypter.dir == txt_file.parent
+        assert encrypter.encrypted_file_path is not None
 
     @pytest.mark.parametrize("wrong_path", ["/wrong/dir/path", "/wrong/file/path.txt"])
     def test_should_raise_assertion_error_on_wrong_path(self, wrong_path: str) -> None:
         with pytest.raises(ValueError):
-            Access(Path(wrong_path))
+            Encrypter(Path(wrong_path))
 
 
-class TestAccess:
+class TestEncrypter:
     def test_should_select_latest_encrypted_file_from_list_of_ones(self, monkeypatch: Any, tmp_path: Path) -> None:
-        access = Access(tmp_path)
+        encrypter = Encrypter(tmp_path)
         files_names = ["dummy_1.gpg", "dummy_2.gpg", "dummy_3.gpg", "dummy_4.gpg", "dummy_5.gpg"]
         for name in files_names:
             p = tmp_path / name
             p.write_text("dummy content")
             time.sleep(0.1)
         assert len(list(tmp_path.iterdir())) == len(files_names)
-        assert access.find_latest_file() == tmp_path / files_names[-1]
+        assert encrypter.find_newest_encrypted_file() == tmp_path / files_names[-1]
 
     @pytest.mark.parametrize(
         "keyword, result",
@@ -145,50 +145,50 @@ class TestAccess:
     def test_should_find_proper_result_for_keyword(
             self, keyword: str, result: str, gpg_file: Path, txt_file: Path
     ) -> None:
-        with Access(gpg_file, passphrase=PASSPHRASE) as access:
-            found = access.search_in_content(keyword)
+        with Encrypter(gpg_file, passphrase=PASSPHRASE) as encrypter:
+            found = encrypter.search_in_content(keyword)
             assert found == {Credentials(*result.split())}
 
     @pytest.mark.parametrize("update, txt_file", [(UPDATE_CONTENT, CONTENT)], indirect=["txt_file"])
     def test_should_encrypt_updated_gpg_file_recognized_content_into_new_file(
             self, update: str, txt_file: Path, gpg_file: Path
     ) -> None:
-        access = Access(gpg_file, passphrase=PASSPHRASE)
-        access.add_content(update)
-        access.encrypt_and_export_to_new_file_if_content_updated(passphrase=PASSPHRASE)
+        encrypter = Encrypter(gpg_file, passphrase=PASSPHRASE)
+        encrypter.add_content(update)
+        encrypter.encrypt_into_new_file_if_content_updated(passphrase=PASSPHRASE)
 
-        new_access = Access(gpg_file.parent, passphrase=PASSPHRASE)
+        new_encrypter = Encrypter(gpg_file.parent, passphrase=PASSPHRASE)
         resource, *rest = update.split()
-        found = new_access.search_in_content(pattern=resource)
+        found = new_encrypter.search_in_content(pattern=resource)
         assert found == {Credentials(resource, *rest)}
-        assert new_access.archive_path is not None
+        assert new_encrypter.encrypted_file_path is not None
 
     @pytest.mark.parametrize("content, update, txt_file", [(CONTENT, UPDATE_CONTENT, CONTENT)], indirect=["txt_file"])
     def test_should_encrypt_updated_text_file_recognized_content_into_new_file(
             self, content: str, update: str, txt_file: Path
     ) -> None:
-        access = Access(txt_file)
-        access.add_content(update)
-        access.encrypt_and_export_to_new_file_if_content_updated(passphrase=PASSPHRASE)
+        encrypter = Encrypter(txt_file)
+        encrypter.add_content(update)
+        encrypter.encrypt_into_new_file_if_content_updated(passphrase=PASSPHRASE)
 
-        new_access = Access(txt_file.parent, passphrase=PASSPHRASE)
+        new_encrypter = Encrypter(txt_file.parent, passphrase=PASSPHRASE)
         for line in content.splitlines() + [update]:
             resource, *rest = line.split()
-            found = new_access.search_in_content(pattern=resource)
+            found = new_encrypter.search_in_content(pattern=resource)
             assert found == {Credentials(resource, *rest)}
 
-        assert new_access.archive_path is not None
+        assert new_encrypter.encrypted_file_path is not None
 
     @pytest.mark.parametrize("content", [CONTENT])
     @pytest.mark.parametrize("txt_file", [CONTENT], indirect=["txt_file"])
     def test_should_remove_credentials_from_memory_for_the_pattern(
             self, gpg_file: Path, txt_file: Path, content: str
     ) -> None:
-        access = Access(gpg_file, passphrase=PASSPHRASE)
+        encrypter = Encrypter(gpg_file, passphrase=PASSPHRASE)
         pattern = "resource"
-        found = access.search_in_content(pattern=pattern)
+        found = encrypter.search_in_content(pattern=pattern)
         assert len(found) == len(content.split(FILE_ITEMS_SEPARATOR))
-        access.remove_credentials(pattern=pattern)
+        encrypter.remove_credentials(pattern=pattern)
 
-        result = access.search_in_content(pattern=pattern)
+        result = encrypter.search_in_content(pattern=pattern)
         assert len(result) == 0

@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.1.0'
+#  version ='1.2.0'
 #  -------------------------------------------------------------------------
 
 import logging
@@ -13,6 +13,9 @@ import pytest
 import src.utils as utils
 
 _log = logging.getLogger(__name__)
+
+
+# TODO: use txt_file fixture instead ot tmp_file
 
 
 @pytest.fixture
