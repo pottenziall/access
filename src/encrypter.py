@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.2.0'
+#  version ='1.2.1'
 #  -------------------------------------------------------------------------
 
 import io
@@ -9,13 +9,13 @@ import logging
 import os
 import re
 import uuid
-from dataclasses import dataclass, fields
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import List, Optional, Set, Type
 
 import gnupg  # type: ignore
+from dataclasses import dataclass, fields
 
 _log = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class Encrypter:
 
     ENCRYPTED_FILE_EXTENSION = "gpg"
 
-    def __init__(self, path: Path, passphrase: Optional[str] = None) -> None:
+    def __init__(self, path: Path, passphrase: Optional[str] = None):
         self.dir: Optional[Path] = None
         self.encrypted_file_path: Optional[Path] = None
         self._is_content_updated: bool = False
@@ -224,7 +224,6 @@ class Encrypter:
             _log.warning("No content to search in")
             return set()
         found = {c for c in self.__credentials if re.search(pattern, str(c))}
-        _log.info(f"Found {len(found)} credentials")
         return found
 
     def remove_credentials(self, pattern: str) -> None:
