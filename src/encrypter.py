@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.2.1'
+#  version ='1.2.2'
 #  -------------------------------------------------------------------------
 
 import io
@@ -24,6 +24,7 @@ FILE_ITEMS_SEPARATOR = "\n"
 
 @dataclass(frozen=True)
 class Credentials:
+    id: int
     resource: str
     login: str
     password: str
@@ -33,32 +34,32 @@ class Credentials:
     def __post_init__(self) -> None:
         for field in fields(self):
             field_value = getattr(self, field.name)
-            if field_value.count(" "):
+            if isinstance(field_value, str) and field_value.count(" "):
                 raise ValueError(f"Field '{field.name}' shouldn't contain spaces")
         if not re.match(r"\d\d.\d\d.\d\d\d\d", self.updated_on):
             raise ValueError(f"Wrong date string: {self.updated_on}")
 
     @classmethod
-    def from_string(cls, string_value: str) -> Set["Credentials"]:
+    def from_string(cls, string_value: str, id_start_from: int = 1) -> Set["Credentials"]:
         credentials = set()
-        for i, line in enumerate(string_value.strip().split(FILE_ITEMS_SEPARATOR), start=1):
+        for i, line in enumerate(string_value.strip().split(FILE_ITEMS_SEPARATOR), start=id_start_from):
             try:
-                credentials.add(cls(*line.split()))
+                credentials.add(cls(i, *line.split()))
             except Exception:
                 _log.error(f"Invalid line {i}. Skip parsing the line")
         return credentials
 
     @classmethod
-    def from_file(cls, path: Path) -> Set["Credentials"]:
+    def from_file(cls, path: Path, id_start_from: int = 1) -> Set["Credentials"]:
         with open(path, "r", encoding="utf8") as f:
-            return cls.from_string(f.read())
+            return cls.from_string(f.read(), id_start_from=id_start_from)
 
     def as_line(self) -> str:
-        values = [getattr(self, field.name) for field in fields(self)]
+        values = [getattr(self, field.name) for field in fields(self) if field.name != "id"]
         return " ".join(values)
 
     def __str__(self) -> str:
-        values = [getattr(self, field.name) for field in fields(self)]
+        values = [str(getattr(self, field.name)) for field in fields(self)]
         return (5 * " ").join(values)
 
 
@@ -93,6 +94,9 @@ class Encrypter:
         exc_tb: Optional[TracebackType],
     ) -> None:
         self.encrypt_into_new_file_if_content_updated()
+
+    def items_count(self) -> int:
+        return len(self.__credentials)
 
     def _handle_input_path(self, path: Path, passphrase: Optional[str] = None) -> None:
         """
@@ -144,7 +148,7 @@ class Encrypter:
         return newest_file_path
 
     def _get_credentials_from_text_file(self, path: Path) -> None:
-        self._update_credentials(Credentials.from_file(path))
+        self._update_credentials(Credentials.from_file(path, id_start_from=self.items_count() + 1))
         _log.debug(f"Got credentials of the text file: {path}")
 
     def decrypt_file(self, path: Path, passphrase: Optional[str] = None) -> None:
@@ -156,7 +160,9 @@ class Encrypter:
         if not result.ok:
             raise ValueError("Wrong password")
         self.encrypted_file_path = path
-        self.__credentials.update(Credentials.from_string(result.data.decode("utf8")))
+        self.__credentials.update(
+            Credentials.from_string(result.data.decode("utf8"), id_start_from=self.items_count() + 1)
+        )
         _log.debug(f"Got credentials of the encrypted file: {path}")
         del result
 
@@ -211,13 +217,15 @@ class Encrypter:
 
     def add_content(self, content: str) -> None:
         """Add credentials to the existing base in memory"""
-        self._update_credentials(Credentials.from_string(content))
+        self._update_credentials(Credentials.from_string(content, id_start_from=self.items_count() + 1))
 
     def _update_credentials(self, credentials_sets: Set[Credentials]) -> None:
         self.__credentials.update(credentials_sets)
         self._is_content_updated = True
-        _log.debug(f"{len(credentials_sets)} credentials sets has been added to the existing base in memory")
+        _log.debug(f"{len(credentials_sets)} credentials sets have been added to the existing base in memory")
+        _log.debug(f"Total number of credentials in memory: {self.items_count}")
 
+    # TODO: return list instead of set. Increase coverage of related tests
     def search_in_content(self, pattern: str) -> Set[Credentials]:
         """Search for "pattern" in the decrypted file content"""
         if not self.__credentials:
