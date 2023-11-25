@@ -1,12 +1,12 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.2.1'
+#  version ='1.2.3'
 #  -------------------------------------------------------------------------
 
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, List
 
 import pytest
 
@@ -15,14 +15,17 @@ from src.encrypter import Encrypter
 
 _log = logging.getLogger(__name__)
 
+TestItems = Tuple[Path, List[str]]
+
 CONFIG_FILE_CONTENT = f'{{"work_dir": "{str(DEFAULT_WORK_DIR)}"}}'
 
 
 @pytest.fixture(scope="function")
-def config_file(request: Any, txt_file: Path) -> Path:
-    with open(txt_file, "r", encoding="utf8") as f:
+def config_file(request: Any, txt_file: TestItems) -> Path:
+    txt_path, _ = txt_file
+    with open(txt_path, "r", encoding="utf8") as f:
         f.write(request.param)
-    return txt_file
+    return txt_path
 
 
 class TestCreateCLIAccessManager:
@@ -37,10 +40,11 @@ class TestCreateCLIAccessManager:
         ],
         indirect=["txt_file"],
     )
-    def test_should_create_instance_from_params(self, txt_file: Path, result: Dict[str, str], work_path: Path) -> None:
-        sut = CLIAccessManager(Encrypter, config_path=txt_file, work_path=work_path)
+    def test_should_create_instance_from_params(self, txt_file: TestItems, result: Dict[str, str], work_path: Path) -> None:
+        txt_path, _ = txt_file
+        sut = CLIAccessManager(Encrypter, config_path=txt_path, work_path=work_path)
         assert sut._encrypter_class == Encrypter
-        assert sut._config_path == txt_file
+        assert sut._config_path == txt_path
         assert sut._config == result
         assert sut._encrypter is None
 

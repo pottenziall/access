@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.2.2'
+#  version ='1.2.3'
 #  -------------------------------------------------------------------------
 
 import io
@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
-from typing import List, Optional, Set, Type
+from typing import List, Optional, Type
 
 import gnupg  # type: ignore
 from dataclasses import dataclass, fields
@@ -40,17 +40,17 @@ class Credentials:
             raise ValueError(f"Wrong date string: {self.updated_on}")
 
     @classmethod
-    def from_string(cls, string_value: str, id_start_from: int = 1) -> Set["Credentials"]:
-        credentials = set()
+    def from_string(cls, string_value: str, id_start_from: int = 1) -> List["Credentials"]:
+        credentials = []
         for i, line in enumerate(string_value.strip().split(FILE_ITEMS_SEPARATOR), start=id_start_from):
             try:
-                credentials.add(cls(i, *line.split()))
+                credentials.append(cls(i, *line.split()))
             except Exception:
                 _log.error(f"Invalid line {i}. Skip parsing the line")
         return credentials
 
     @classmethod
-    def from_file(cls, path: Path, id_start_from: int = 1) -> Set["Credentials"]:
+    def from_file(cls, path: Path, id_start_from: int = 1) -> List["Credentials"]:
         with open(path, "r", encoding="utf8") as f:
             return cls.from_string(f.read(), id_start_from=id_start_from)
 
@@ -68,8 +68,7 @@ class Encrypter:
     Wrapper class for gnupg encrypter.
     Add/remove/search credentials (e.g. "gmail.com login password authentication") to/from/in an encrypted text file.
     Encrypt a changed content on exiting. Show item creation date.
-
-    :param path: either path to an encrypted *.gpg file or a text file or a directory (will be used as working directory)
+    :param path: either path to an encrypted *.gpg file or a text file or a directory (will be used as working dir)
     :param passphrase: if provided, a modal window for input a passphrase won't appear (for testing only)
     """
 
@@ -81,7 +80,7 @@ class Encrypter:
         self._is_content_updated: bool = False
         # TODO: provide path to GPG
         self._gpg = gnupg.GPG()
-        self.__credentials: Set[Credentials] = set()
+        self.__credentials: List[Credentials] = []
         self._handle_input_path(path=path, passphrase=passphrase)
 
     def __enter__(self) -> "Encrypter":
@@ -160,7 +159,7 @@ class Encrypter:
         if not result.ok:
             raise ValueError("Wrong password")
         self.encrypted_file_path = path
-        self.__credentials.update(
+        self.__credentials.extend(
             Credentials.from_string(result.data.decode("utf8"), id_start_from=self.items_count() + 1)
         )
         _log.debug(f"Got credentials of the encrypted file: {path}")
@@ -169,9 +168,9 @@ class Encrypter:
     def encrypt_into_new_file_if_content_updated(self, passphrase: Optional[str] = None) -> Optional[Path]:
         """Encrypt updated credentials into a new file"""
         if not self._is_content_updated:
-            _log.debug("Content has not been changed. Skip new file creation")
+            _log.info("Content has not been changed. Skip new file creation")
             return None
-        _log.debug("Content has been changed. Creating new encrypted file...")
+        _log.info("Content has been changed. Creating new encrypted file...")
         content_string = FILE_ITEMS_SEPARATOR.join([c.as_line() for c in self.__credentials])
         new_encrypted_file_path = self.encrypt_bytes_content_into_file(
             content=content_string.encode("utf8"), passphrase=passphrase
@@ -219,26 +218,27 @@ class Encrypter:
         """Add credentials to the existing base in memory"""
         self._update_credentials(Credentials.from_string(content, id_start_from=self.items_count() + 1))
 
-    def _update_credentials(self, credentials_sets: Set[Credentials]) -> None:
-        self.__credentials.update(credentials_sets)
-        self._is_content_updated = True
-        _log.debug(f"{len(credentials_sets)} credentials sets have been added to the existing base in memory")
+    def _update_credentials(self, credentials_sets: List[Credentials]) -> None:
+        if credentials_sets:
+            self.__credentials.extend(credentials_sets)
+            self._is_content_updated = True
+            _log.debug(f"{len(credentials_sets)} credentials sets have been added to the existing base in memory")
         _log.debug(f"Total number of credentials in memory: {self.items_count}")
 
     # TODO: return list instead of set. Increase coverage of related tests
-    def search_in_content(self, pattern: str) -> Set[Credentials]:
+    def search_in_content(self, pattern: str) -> List[Credentials]:
         """Search for "pattern" in the decrypted file content"""
-        if not self.__credentials:
-            _log.warning("No content to search in")
-            return set()
-        found = {c for c in self.__credentials if re.search(pattern, str(c))}
-        return found
+        if self.__credentials:
+            found = [c for c in self.__credentials if re.search(pattern, str(c))]
+            _log.debug(f"Found {len(found)} credentials sets in memory")
+            return found
+        _log.warning("No content in memory to search in")
+        return []
 
-    def remove_credentials(self, pattern: str) -> None:
-        if not pattern:
-            _log.warning("Please provide a pattern to remove credentials")
-            return
+    def remove_credentials(self, pattern: str) -> int:
         found = self.search_in_content(pattern)
-        self.__credentials = self.__credentials - found
-        self._is_content_updated = True
-        _log.info(f"{len(found)} credentials removed successfully")
+        for item in found:
+            self.__credentials.remove(item)
+            self._is_content_updated = True
+        _log.debug(f"{len(found)} credentials sets have been removed successfully")
+        return len(found)

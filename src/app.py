@@ -1,7 +1,7 @@
 #  Copyright (c) 2022-2023
 #  --------------------------------------------------------------------------
 #  Created By: Volodymyr Matsydin
-#  version ='1.2.1'
+#  version ='1.2.3'
 #  -------------------------------------------------------------------------
 import json
 import logging
@@ -110,7 +110,7 @@ class CLIAccessManager:
                 if selected_function == Function.UNDEFINED:
                     input_value = input("Please enter 'search', 'add' or 'remove' to continue: ")
                     if input_value not in [v.value for v in Function]:
-                        _log.warning("Wrong input")
+                        call(["echo", "Wrong input"], timeout=5)
                         continue
                     selected_function = Function(input_value)
 
@@ -129,24 +129,24 @@ class CLIAccessManager:
     def _is_input_valid(value: str, pattern: str) -> bool:
         if re.match(pattern, value):
             return True
-        _log.warning(f"Input phrase is not valid")
+        call(["echo", "Input phrase is not valid"])
         return False
 
     def add_credentials(self, encrypter: Encrypter) -> bool:
-        input_message = "ADD mode. Please input new credentials:"
+        input_message = "ADDING MODE. Please input new credentials:"
         input_value = self.get_input_value_safely(input_message, timeout=60)
         if input_value == "exit":
-            _log.info("Exit adding mode")
+            call(["echo", "Exit adding mode"])
             return False
         if input_value and self._is_input_valid(value=input_value, pattern=ADD_VALUE_PATTERN):
             encrypter.add_content(input_value)
         return True
 
     def search_credentials(self, encrypter: Encrypter) -> bool:
-        input_message = "SEARCH mode. Type min 3 ch to search:"
+        input_message = "SEARCHING MODE. Type min 3 ch to search:"
         input_value = self.get_input_value_safely(input_message).lower()
         if input_value == "exit":
-            _log.info("Exit searching mode")
+            call(["echo", "Exit searching mode"])
             return False
         if input_value and self._is_input_valid(value=input_value, pattern=SEARCH_VALUE_PATTERN):
             found = encrypter.search_in_content(input_value)
@@ -156,10 +156,10 @@ class CLIAccessManager:
         return True
 
     def remove_credentials(self, encrypter: Encrypter) -> bool:
-        input_message = "REMOVE mode. Please input credentials pattern to remove:"
+        input_message = "REMOVING MODE. Please input credentials pattern to remove:"
         input_pattern = self.get_input_value_safely(input_message, timeout=60)
         if input_pattern == "exit":
-            _log.info("Exit removing mode")
+            call(["echo", "Exit removing mode"])
             return False
         if input_pattern:
             credentials_to_remove = encrypter.search_in_content(pattern=input_pattern)
@@ -168,9 +168,10 @@ class CLIAccessManager:
                 self.show_data_safely([str(c) for c in credentials_to_remove], Color.RED)
                 remove_message = "Enter 'yes' to remove or any key to cancel: "
                 if input(remove_message) == "yes":
-                    encrypter.remove_credentials(pattern=input_pattern)
+                    removed = encrypter.remove_credentials(pattern=input_pattern)
+                    call(["echo", f"{removed} credentials sets have been removed"], timeout=5)
                 else:
-                    _log.info("Skip removing")
+                    call(["echo", "Skip removing"], timeout=5)
         return True
 
     # TODO: clear screen in case of exception
